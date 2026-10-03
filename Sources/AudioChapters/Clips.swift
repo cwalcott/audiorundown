@@ -111,6 +111,11 @@ enum Clips {
         let plan: ClipPlan
         do { plan = try JSONDecoder().decode(ClipPlan.self, from: Data(contentsOf: planURL)) }
         catch { throw UserError("Invalid clip plan: \(error.localizedDescription). See examples/sections.json for the format.") }
+        try await export(source: source, plan: plan, destination: destination)
+    }
+
+    static func export(source: URL, plan: ClipPlan, destination: URL) async throws {
+        try requireNew(destination)
         guard !plan.clips.isEmpty else { throw UserError("The clip plan is empty.") }
         log("Checking decoded source duration…")
         let sourceDuration = try sourceDuration(of: source)

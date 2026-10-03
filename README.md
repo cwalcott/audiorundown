@@ -1,40 +1,63 @@
 # AudioChapters
 
-Turn a long recording into a timestamped transcript, explore it at different levels of detail, and export selected sections as individual MP3 episodes.
+Turn a long recording into a readable rundown, then export selected sections as individual MP3 episodes for Overcast.
 
-Transcription runs locally through Apple's **SpeechAnalyzer / SpeechTranscriber**. There are no cloud API keys or Swift package dependencies. Audio decoding and MP3 export use FFmpeg.
+Transcription uses Apple's **SpeechAnalyzer / SpeechTranscriber**. Summaries and natural-language clip selection use the **Foundation Models framework's on-device Apple Intelligence model**. Audio decoding and MP3 export use FFmpeg. No cloud fallback, API keys, or Swift package dependencies.
 
 ## Everyday workflow
 
-After the [one-time setup](#one-time-setup), start each new episode from the project directory:
+After the [one-time setup](#one-time-setup), run:
 
 ```sh
 cd ~/Development/cwalcott/audiochapters
-.build/release/audiochapters transcribe "/path/to/recording.mp3"
+.build/release/audiochapters rundown "/path/to/recording.mp3" --interactive
 ```
 
-**That is the only command you need to prepare an episode for discussion in Codex.**
+This transcribes the audio if needed, generates a complete Markdown rundown, and opens a terminal prompt for choosing clips. Defaults are `en-US` and a `recording.transcript` folder beside the audio. Existing transcripts and finished rundowns are reused.
 
-The defaults are:
+Read `recording.transcript/rundown/rundown.md` in your preferred Markdown viewer. Each numbered main segment has a short **Summary** followed by a **Detailed rundown** of lettered clips. The generator aims for about five main segments, usually within ten, with flexibility for recordings with many topics. The saved `rundown.json` keeps the IDs and original timestamps stable.
 
-- **Language:** `en-US`.
-- **Output folder:** beside the original audio, with `.transcript` replacing the file extension. For example, `/Users/cwalcott/Downloads/recording.mp3` produces `/Users/cwalcott/Downloads/recording.transcript/`.
+At the terminal prompt, enter a selection:
 
-When transcription finishes, the tool prints the output folder's path. Then continue in your Codex chat:
+```text
+1, 3b
+Export the Sharon Stone story and the Ralph billing story
+Export the whole Letterman segment with 10 seconds before it
+```
 
-1. **Get an overview:** “Give me a high-level summary of the full episode in `/Users/cwalcott/Downloads/recording.transcript`, with timestamps.”
-2. **Explore a section:** “Break down the Letterman section,” or “Give me more detail about 01:12–01:47.” You can change the level of detail without retranscribing.
-3. **Choose clips:** “Export the Sharon Stone story and the Ralph billing story as separate MP3s with descriptive titles.” Codex can use the transcript and original audio path to prepare the selections and run the export commands.
-4. **Listen:** Upload the resulting MP3s through your Overcast upload workflow.
+These descriptions are examples; available topics depend on the recording. The tool prints the selected titles and times, then exports each selection as an MP3. If a request is ambiguous, it asks a follow-up question. Use `list` to see the IDs, `show 3b` to read an item's summary, or `quit` to exit. Selecting a parent segment and one of its children exports the parent once.
 
-Codex can read the local transcript directly; the `context` command is optional. If you use another assistant without access to these files, attach the transcript or use the [optional context workflow](#optional-prepare-context-for-an-assistant) below.
+Exports go beside the audio in `recording.clips/selection-001/`, then `selection-002/`, and so on. Upload the MP3s through your Overcast upload workflow. Uploading is still manual.
 
-Transcription stays on your Mac. Summarizing in Codex shares the transcript text with the assistant; the utility itself does not generate summaries. MP3 uploads to Overcast are a separate step.
+### Generate now, choose clips later
+
+Omit `--interactive` to generate only the rundown. You can also start from an existing transcript folder or `transcript.json`:
+
+```sh
+.build/release/audiochapters rundown "/path/to/recording.transcript"
+.build/release/audiochapters select "/path/to/recording.transcript/rundown"
+```
+
+For a single request, or to check the selection before exporting:
+
+```sh
+.build/release/audiochapters select "/path/to/recording.transcript/rundown" \
+  --request "3b, 5" --preview
+.build/release/audiochapters select "/path/to/recording.transcript/rundown" \
+  --request "Export the guitar discussion with 10 seconds before it"
+```
+
+`--preview` creates no files. `--out-dir DIR` chooses a new export folder; `--source AUDIO` locates the original if you moved it. Exact IDs require no language model. Natural-language selection uses only the saved catalog, so use the existing `clip` command below for custom time ranges or finer cuts.
+
+`rundown --out-dir DIR` changes the rundown destination; its transcript still uses the normal adjacent folder. To choose a different transcript location, run `transcribe --out-dir DIR` first and pass that folder to `rundown`. Intermediate model results are cached in the transcript's `.rundown-cache` folder, so rerunning after an interruption reuses completed analysis. A finished rundown is reused without changing its IDs; choose a new rundown destination to regenerate it.
+
+The local rundown is experimental. If Apple returns an invalid topic plan or declines structured generation, the tool reports that and uses vocabulary changes between notes to place approximate boundaries; Apple still writes the summaries and fallback titles. The model summarizes roughly two- to three-minute transcript pieces, groups them, then writes the finished summaries. Clip boundaries currently fall on those piece boundaries, so they can include neighboring material or miss the beginning of a story. Use `clip` for precise cuts. Our Stern tests also found missed topics, incorrect attribution, and jokes described as facts; this is a draft listening guide, not a verified account. Check selections with `--preview`, and use padding when a story needs more context. A long recording can take several minutes to summarize. All audio and transcript processing by these commands stays on your Mac.
 
 ## One-time setup
 
 - Apple silicon Mac, macOS 26 or later, with a supported speech language.
-- Xcode 26 or later (including the macOS SDK and Swift toolchain).
+- Xcode 27 or later to build this version (it uses the current Foundation Models SDK).
+- Apple Intelligence enabled and its on-device model ready for rundown generation and natural-language selection. `doctor` reports availability.
 - FFmpeg for audio decoding and MP3 export: `brew install ffmpeg` if needed.
 
 ```sh
@@ -89,11 +112,11 @@ Give that file to Codex or another assistant to summarize. Then prepare a more d
 
 Choose `overview`, `standard`, or `detailed`. This changes the summary instructions; it never discards the underlying transcript or requires retranscription. Selected ranges include overlapping segments in full to retain context. Timestamps always refer to the original recording.
 
-**`context` writes a prompt plus transcript; it does not generate a summary or call a model.** Summarization in this chat shares that text with the assistant. There is no on-device summarization engine in this version. No speaker names are inferred by the transcription utility. Review important names, quotations, and clip boundaries against the audio.
+**`context` writes a prompt plus transcript; it does not generate a summary or call a model.** Summarization in this chat shares that text with the assistant. Use `rundown` for on-device summarization instead. No speaker names are inferred by the transcription utility. Review important names, quotations, and clip boundaries against the audio.
 
 ## Optional: export clips from the terminal
 
-You can ask Codex to export your selections, as above, or use these commands yourself.
+Use these commands for exact time ranges or a hand-written export plan.
 
 ### Export one section
 
@@ -153,5 +176,6 @@ User audio, transcripts, and local experiments belong in ignored `work/`. Do not
 ## References
 
 - [Apple: SpeechAnalyzer and on-device long-form transcription](https://developer.apple.com/videos/play/wwdc2025/277/)
+- [Apple: Foundation Models](https://developer.apple.com/documentation/foundationmodels)
 - [Apple: SpeechTranscriber](https://developer.apple.com/documentation/speech/speechtranscriber)
 - [FFmpeg: seeking, duration, and metadata](https://ffmpeg.org/ffmpeg.html)

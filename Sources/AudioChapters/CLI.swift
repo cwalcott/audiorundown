@@ -56,6 +56,15 @@ struct AudioChapters {
             let source = try a.source()
             let destination = a.options["--out-dir"].map(fileURL) ?? source.deletingPathExtension().appendingPathExtension("transcript")
             try await Transcription.run(source: source, language: a.options["--language"] ?? "en-US", destination: destination, downloadAssets: !a.flags.contains("--no-download"))
+        case "rundown":
+            let a = try Arguments(rest, values: ["--language", "--out-dir"], switches: ["--no-download", "--interactive"])
+            let output = try await RundownGenerator.run(input: a.source(), destination: a.options["--out-dir"].map(fileURL), language: a.options["--language"] ?? "en-US", downloadAssets: !a.flags.contains("--no-download"))
+            if a.flags.contains("--interactive") {
+                try await Selection.run(input: output, request: nil, destination: nil, sourceOverride: nil, preview: false)
+            }
+        case "select":
+            let a = try Arguments(rest, values: ["--request", "--out-dir", "--source"], switches: ["--preview"])
+            try await Selection.run(input: a.source(), request: a.options["--request"], destination: a.options["--out-dir"].map(fileURL), sourceOverride: a.options["--source"].map(fileURL), preview: a.flags.contains("--preview"))
         case "clip":
             let a = try Arguments(rest, values: ["--start", "--end", "--output", "--title", "--album", "--artist"])
             try Clips.single(source: a.source(), output: fileURL(a.required("--output")), start: a.required("--start"), end: a.required("--end"), title: a.options["--title"], album: a.options["--album"], artist: a.options["--artist"])
@@ -77,6 +86,7 @@ struct AudioChapters {
             guard rest.isEmpty else { throw UserError("doctor takes no arguments.") }
             print("macOS: \(ProcessInfo.processInfo.operatingSystemVersionString)")
             print("Apple SpeechTranscriber: \(SpeechTranscriber.isAvailable ? "available" : "unavailable")")
+            print("Apple Intelligence language model: \(LocalIntelligence.status)")
             for name in ["ffmpeg", "ffprobe"] {
                 print("\(name): \((try? Subprocess.executable(name).path) ?? "not found (install FFmpeg)")")
             }
@@ -90,6 +100,8 @@ struct AudioChapters {
     AudioChapters — local Apple speech transcription and MP3 episode export
 
     USAGE
+      audiochapters rundown INPUT [--out-dir DIR] [--language en-US] [--no-download] [--interactive]
+      audiochapters select RUNDOWN [--request "1, 3b"] [--preview] [--out-dir DIR] [--source AUDIO]
       audiochapters transcribe INPUT [--language en-US] [--out-dir DIR] [--no-download]
       audiochapters clip INPUT --start TIME --end TIME --output FILE.mp3
                          [--title TITLE] [--album ALBUM] [--artist ARTIST]
@@ -121,6 +133,10 @@ struct AudioChapters {
 
     Transcription uses Apple's on-device model; first use may download language assets.
     context prepares a prompt plus timed transcript for an assistant; it does not call a model.
-    Audio decoding and MP3 export require FFmpeg. Summarization and Overcast uploading are separate steps.
+    rundown accepts audio, a transcript folder, or transcript.json; it reuses existing transcripts.
+    Rundowns and natural-language selection use Apple Intelligence locally. IDs work without it.
+    Default rundown: INPUT.transcript/rundown/{rundown.md,rundown.json}.
+    Default selections: INPUT.clips/selection-001/ (then 002, 003…).
+    Audio decoding and MP3 export require FFmpeg. Upload exported MP3s to Overcast manually.
     """
 }
