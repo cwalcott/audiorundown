@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import AudioChapters
+@testable import AudioRundown
 
 @Test func ollamaRejectsPartialAndEmptyResponses() throws {
     let good = Data(#"{"done":true,"done_reason":"stop","message":{"content":"Complete paragraph."}}"#.utf8)

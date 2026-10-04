@@ -54,7 +54,7 @@ enum Clips {
             let value = tags.first { $0.key.lowercased() == key }?.value.trimmingCharacters(in: .whitespacesAndNewlines)
             return value?.isEmpty == false ? value : nil
         }
-        return (tag("title") ?? source.deletingPathExtension().lastPathComponent, tag("artist") ?? "AudioChapters")
+        return (tag("title") ?? source.deletingPathExtension().lastPathComponent, tag("artist") ?? "AudioRundown")
     }
 
     /// MP3 container duration may be an estimate. Decode once for an exact timeline.
@@ -124,12 +124,12 @@ enum Clips {
         let range = try AudioRange(start: startSeconds, end: endSeconds, sourceDuration: sourceDuration(of: source))
         let fm = FileManager.default
         try fm.createDirectory(at: output.deletingLastPathComponent(), withIntermediateDirectories: true)
-        let staging = output.deletingLastPathComponent().appendingPathComponent(".audiochapters-\(UUID().uuidString).mp3")
+        let staging = output.deletingLastPathComponent().appendingPathComponent(".audiorundown-\(UUID().uuidString).mp3")
         defer { try? fm.removeItem(at: staging) }
         try encode(source: source, output: staging, range: range,
                    title: title ?? output.deletingPathExtension().lastPathComponent,
                    album: album ?? source.deletingPathExtension().lastPathComponent,
-                   artist: artist ?? "AudioChapters", track: "1/1")
+                   artist: artist ?? "AudioRundown", track: "1/1")
         try requireNew(output)
         try fm.moveItem(at: staging, to: output)
         log("Saved \(output.path) (\(Timecode.format(range.duration)))")
@@ -158,7 +158,7 @@ enum Clips {
         }
         let episode = plan.useSourceMetadata == true ? try episodeMetadata(source: source) : nil
         let album = episode?.title ?? plan.album ?? source.deletingPathExtension().lastPathComponent
-        let artist = episode?.artist ?? plan.artist ?? "AudioChapters"
+        let artist = episode?.artist ?? plan.artist ?? "AudioRundown"
         try await withNewDirectory(at: destination) { staging in
             var entries: [ExportReceipt.Entry] = []
             for (index, clip) in plan.clips.enumerated() {

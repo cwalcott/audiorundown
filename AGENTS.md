@@ -1,8 +1,8 @@
-# AudioChapters
+# AudioRundown
 
 ## Purpose and workflow
 
-AudioChapters is a Swift command-line utility for transcribing long recordings, creating readable episode rundowns, and exporting selected sections as MP3s for listening or manual upload to Overcast. Read `README.md` for commands and `VALIDATION.md` for measured results and known limitations.
+AudioRundown is a Swift command-line utility for transcribing long recordings, creating readable episode rundowns, and exporting selected sections as MP3s for listening or manual upload to Overcast. Read `README.md` for commands and `VALIDATION.md` for measured results and known limitations.
 
 Prefer simple defaults and an interactive selection workflow. Rundowns should have roughly five main segments, usually no more than ten, but follow the recording's topics rather than enforcing a fixed count. Each numbered segment has a short Summary followed by a Detailed rundown of lettered clips. Keep Markdown easy to skim.
 
@@ -10,14 +10,14 @@ Prefer simple defaults and an interactive selection workflow. Rundowns should ha
 
 - Swift 6 package targeting macOS 26 or later on Apple silicon. The current implementation is built with Xcode 27 or later; it uses Apple Speech and Foundation Models frameworks. There are no third-party Swift package dependencies.
 - FFmpeg and FFprobe are required for decoding and export. Apple Intelligence is needed only for the Apple summarization/selection backend; Ollama is optional and uses an already installed local model.
-- After Swift changes, run `swift test` and `swift build -c release` from the repository root. The executable is `.build/release/audiochapters`.
-- When changing audio decoding, seeking, export, or export metadata, also run `python3 scripts/test_exports.py .build/release/audiochapters`. It uses synthetic audio and temporary files.
+- After Swift changes, run `swift test` and `swift build -c release` from the repository root. The executable is `.build/release/audiorundown`.
+- When changing audio decoding, seeking, export, or export metadata, also run `python3 scripts/test_exports.py .build/release/audiorundown`. It uses synthetic audio and temporary files.
 - For selection changes, exercise `select ... --preview` against an available saved rundown. Exact IDs need no model; test natural-language selection separately when its backend is available.
 - Reuse saved transcripts for experiments. Full transcription and model runs are expensive and are not routine regression checks. Documentation-only edits do not require rebuilding.
 
 ## Code map
 
-- `Sources/AudioChapters/CLI.swift`: argument parsing, command dispatch, and help.
+- `Sources/AudioRundown/CLI.swift`: argument parsing, command dispatch, and help.
 - `Settings.swift`, `Workflow.swift`: saved preferences, rundown discovery, and next-step commands.
 - `Transcription.swift`: Apple Speech transcription and transcript outputs.
 - `RundownGenerator.swift`, `TopicGrouping.swift`: local summary generation and topic grouping.
@@ -26,9 +26,9 @@ Prefer simple defaults and an interactive selection workflow. Rundowns should ha
 - `OpenAIClient.swift`, `OpenAIRundown.swift`: explicit API transport, full-transcript generation, usage/cost estimates, and response caching.
 - `Selection.swift`: interactive requests, catalog IDs, and export plans.
 - `Clips.swift`, `Support.swift`: audio export, timecodes, subprocesses, and atomic outputs.
-- `Tests/AudioChaptersTests/`: Swift Testing tests; `scripts/test_exports.py`: FFmpeg integration checks.
+- `Tests/AudioRundownTests/`: Swift Testing tests; `scripts/test_exports.py`: FFmpeg integration checks.
 
-Paths in this code map after the first entry are relative to `Sources/AudioChapters/`.
+Paths in this code map after the first entry are relative to `Sources/AudioRundown/`.
 
 ## Preserve these behaviors
 

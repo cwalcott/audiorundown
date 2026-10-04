@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import AudioChapters
+@testable import AudioRundown
 
 private func fixture() -> Rundown {
     Rundown(source: "/audio.mp3", transcriptFingerprint: "test", title: "Episode", duration: 100, createdAt: Date(), segments: [

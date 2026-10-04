@@ -10,7 +10,7 @@ import subprocess
 import sys
 import tempfile
 
-binary = pathlib.Path(sys.argv[1] if len(sys.argv) > 1 else '.build/release/audiochapters').resolve()
+binary = pathlib.Path(sys.argv[1] if len(sys.argv) > 1 else '.build/release/audiorundown').resolve()
 ffmpeg = shutil.which('ffmpeg') or '/opt/homebrew/bin/ffmpeg'
 ffprobe = shutil.which('ffprobe') or '/opt/homebrew/bin/ffprobe'
 
@@ -28,9 +28,9 @@ def inspect(path):
     return json.loads(run(ffprobe, '-v', 'error', '-show_format', '-show_streams', '-of', 'json', path).stdout)
 
 
-with tempfile.TemporaryDirectory(prefix='audiochapters-tests-') as tmp:
+with tempfile.TemporaryDirectory(prefix='audiorundown-tests-') as tmp:
     root = pathlib.Path(tmp)
-    os.environ['AUDIOCHAPTERS_CONFIG'] = str(root / 'config.json')
+    os.environ['AUDIORUNDOWN_CONFIG'] = str(root / 'config.json')
     source = root / 'input with spaces.mp3'
     run(ffmpeg, '-v', 'error', '-f', 'lavfi', '-i', 'sine=frequency=440:duration=2',
         '-f', 'lavfi', '-i', 'sine=frequency=880:duration=2',
@@ -103,7 +103,7 @@ The full story summary is retained in the export record.
 """)
     catalog = root / 'custom-rundown'
     imported = run(binary, 'import-rundown', guide, '--transcript', transcript, '--out-dir', catalog)
-    assert f"Choose clips: audiochapters select '{source}'" in imported.stdout.decode()
+    assert f"Choose clips: audiorundown select '{source}'" in imported.stdout.decode()
     preview = run(binary, 'select', source, '--request', '1a', '--preview')
     assert long_title in preview.stdout.decode()
     assert not source.with_suffix('.clips').exists()
@@ -133,7 +133,7 @@ The full story summary is retained in the export record.
     fallback = next((untagged.with_suffix('.clips') / 'selection-001').glob('*.mp3'))
     fallback_tags = inspect(fallback)['format']['tags']
     assert fallback_tags['title'].endswith(' (Untagged episode)')
-    assert fallback_tags['album'] == 'Untagged episode' and fallback_tags['artist'] == 'AudioChapters'
+    assert fallback_tags['album'] == 'Untagged episode' and fallback_tags['artist'] == 'AudioRundown'
 
     run(binary, 'configure', '--model', 'openai:gpt-6.1-sol', '--editor', 'Visual Studio Code')
     config = json.loads((root / 'config.json').read_text())

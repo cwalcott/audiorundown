@@ -4,7 +4,7 @@ Tested on Apple silicon, macOS 27.0.1, Swift 6.4 / Xcode's macOS 27 SDK.
 
 - `swift test`: 17 tests passed, including full rundown coverage, model boundary validation, exact-ID selection, parent/child deduplication, padding, fractional end-time safety, and fallback grouping, in addition to the original transcription/export helper tests.
 - `swift build -c release`: passed.
-- `python3 scripts/test_exports.py .build/release/audiochapters`: passed. The source is a variable-bitrate MP3 without a Xing seek header. Checks include actual selected audio content, codec, duration, metadata, overwrite rejection, invalid ranges, and batch naming/track numbering.
+- `python3 scripts/test_exports.py .build/release/audiorundown`: passed. The source is a variable-bitrate MP3 without a Xing seek header. Checks include actual selected audio content, codec, duration, metadata, overwrite rejection, invalid ranges, and batch naming/track numbering.
 - Apple's installed English speech assets were used with `--no-download` on the user-provided `THSS.2026-06-02.CF128K-HTB.mp3`.
 - Full transcription succeeded: decoded duration 10,486.047375 seconds (2:54:46), 3,519 segments, 30,868 word timing runs. All segment ranges were finite, ordered within each segment, and within the source duration.
 - An overview context for the full recording and a detailed context for 02:00–08:00 were generated successfully.
@@ -69,3 +69,10 @@ The user also supplied a ChatGPT rundown generated at a reported medium reasonin
 - Thirty Swift tests and the release build passed. Synthetic FFmpeg integration checks passed for source title/artist tags, shortened clip-plus-episode titles and filenames, full title/summary export records, untagged-source fallback, original-MP3 discovery, preview without exports, successive selection directories, and preservation of manual metadata overrides. Existing audio-content/seek and overwrite checks continue to pass.
 - Installed the executable in `~/.bin` and saved the user's Sol/medium/$1 estimated-cap/VS Code preferences. Reused the existing Stern API rundown with the API key removed: no network request or regeneration. Exact-ID preview retained the saved ranges; live Apple selection of the Sharon Stone story with ten seconds after it produced 01:12:50.940–01:18:10.120.
 - No new summary generation or paid API call was needed. These checks cover workflow and metadata, not summary accuracy or display behavior in Overcast.
+
+
+## AudioRundown rename (2026-10-04)
+
+- Renamed the Swift package, executable, source/test targets, documentation, config path, and config override environment variable to AudioRundown / `audiorundown` / `AUDIORUNDOWN_CONFIG`.
+- Clean build from the renamed repository: 30 Swift tests, release build, and synthetic MP3 integration checks passed. Existing saved rundown formats and model cache identities are unchanged.
+- Moved this installation's preferences and updated its local rundown pointer and VS Code launch settings. The installed command is now `~/.bin/audiorundown`.

@@ -8,8 +8,8 @@ struct Settings: Codable {
     var editor: String? = nil
 
     static var location: URL {
-        if let path = ProcessInfo.processInfo.environment["AUDIOCHAPTERS_CONFIG"] { return fileURL(path) }
-        return FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".config/audiochapters/config.json")
+        if let path = ProcessInfo.processInfo.environment["AUDIORUNDOWN_CONFIG"] { return fileURL(path) }
+        return FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".config/audiorundown/config.json")
     }
 
     static func load(from url: URL = location) throws -> Settings {

@@ -78,7 +78,7 @@ enum Selection {
             }
             return segment.clips.filter { ids.contains($0.id) }
         }
-        return ClipPlan(album: rundown.title, artist: "AudioChapters", useSourceMetadata: true, clips: selected.map {
+        return ClipPlan(album: rundown.title, artist: "AudioRundown", useSourceMetadata: true, clips: selected.map {
             .init(title: "\($0.id). \($0.title)",
                   start: Timecode.format(max(0, $0.start - response.beforeSeconds)),
                   end: Timecode.format((min(rundown.duration, $0.end + response.afterSeconds) * 1000).rounded(.down) / 1000), summary: $0.summary)

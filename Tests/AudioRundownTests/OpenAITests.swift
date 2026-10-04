@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import AudioChapters
+@testable import AudioRundown
 
 private func apiTranscript() -> Transcript {
     .init(source: "/fixture.mp3", language: "en-US", duration: 30, createdAt: Date(), segments: [

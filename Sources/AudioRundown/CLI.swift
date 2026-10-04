@@ -29,13 +29,13 @@ struct Arguments {
         return value
     }
     func source() throws -> URL {
-        guard positional.count == 1 else { throw UserError("Expected exactly one input audio file. Run audiochapters --help for examples.") }
+        guard positional.count == 1 else { throw UserError("Expected exactly one input audio file. Run audiorundown --help for examples.") }
         return fileURL(positional[0])
     }
 }
 
 @main
-struct AudioChapters {
+struct AudioRundown {
     static func main() async {
         do { try await run(Array(CommandLine.arguments.dropFirst())) }
         catch {
@@ -112,37 +112,37 @@ struct AudioChapters {
             }
             let locales = await SpeechTranscriber.installedLocales.map(\.identifier).sorted()
             print("Installed speech languages: \(locales.isEmpty ? "none; downloaded on first transcription" : locales.joined(separator: ", "))")
-        default: throw UserError("Unknown command '\(command)'. Run audiochapters --help.")
+        default: throw UserError("Unknown command '\(command)'. Run audiorundown --help.")
         }
     }
 
     static let help = """
-    AudioChapters — local Apple speech transcription and MP3 episode export
+    AudioRundown — local Apple speech transcription and MP3 episode export
 
     USAGE
-      audiochapters rundown INPUT [--model apple|OLLAMA_MODEL|openai:gpt-6.1-sol] [--out-dir DIR] [--language en-US] [--no-download] [--interactive] [--open]
+      audiorundown rundown INPUT [--model apple|OLLAMA_MODEL|openai:gpt-6.1-sol] [--out-dir DIR] [--language en-US] [--no-download] [--interactive] [--open]
                             [--reasoning medium] [--max-cost 1.00] (OpenAI only)
-      audiochapters import-rundown FILE.md --transcript TRANSCRIPT [--out-dir DIR] [--engine LABEL]
-      audiochapters select INPUT [--model apple|OLLAMA_MODEL] [--request "1, 3b"] [--preview] [--out-dir DIR] [--source AUDIO]
-      audiochapters transcribe INPUT [--language en-US] [--out-dir DIR] [--no-download]
-      audiochapters clip INPUT --start TIME --end TIME --output FILE.mp3
+      audiorundown import-rundown FILE.md --transcript TRANSCRIPT [--out-dir DIR] [--engine LABEL]
+      audiorundown select INPUT [--model apple|OLLAMA_MODEL] [--request "1, 3b"] [--preview] [--out-dir DIR] [--source AUDIO]
+      audiorundown transcribe INPUT [--language en-US] [--out-dir DIR] [--no-download]
+      audiorundown clip INPUT --start TIME --end TIME --output FILE.mp3
                          [--title TITLE] [--album ALBUM] [--artist ARTIST]
-      audiochapters export INPUT --plan sections.json [--out-dir DIR]
-      audiochapters context transcript.json --output summary-context.md
+      audiorundown export INPUT --plan sections.json [--out-dir DIR]
+      audiorundown context transcript.json --output summary-context.md
                             [--detail overview|standard|detailed] [--start TIME --end TIME]
-      audiochapters configure [--model MODEL] [--reasoning medium] [--max-cost 1.00] [--editor APP]
-      audiochapters languages
-      audiochapters doctor
+      audiorundown configure [--model MODEL] [--reasoning medium] [--max-cost 1.00] [--editor APP]
+      audiorundown languages
+      audiorundown doctor
 
     TIME accepts seconds, MM:SS, or HH:MM:SS, with optional fractional seconds.
     All times refer to the original recording. Existing outputs are never replaced.
 
     EXAMPLES
-      audiochapters transcribe interview.mp3
-      audiochapters clip interview.mp3 --start 42:15 --end 49:30 \\
+      audiorundown transcribe interview.mp3
+      audiorundown clip interview.mp3 --start 42:15 --end 49:30 \\
         --title "Why the first approach failed" --output first-approach.mp3
-      audiochapters export interview.mp3 --plan selected.json --out-dir episodes
-      audiochapters context interview.transcript/transcript.json --detail detailed \\
+      audiorundown export interview.mp3 --plan selected.json --out-dir episodes
+      audiorundown context interview.transcript/transcript.json --detail detailed \\
         --start 42:15 --end 49:30 --output deep-dive.md
 
     TRANSCRIPT OUTPUTS
@@ -158,7 +158,7 @@ struct AudioChapters {
     context prepares a prompt plus timed transcript for an assistant; it does not call a model.
     rundown accepts audio, a transcript folder, or transcript.json; it reuses existing transcripts.
     Rundown uses your saved model preference (apple on a fresh install). Flags override preferences.
-    configure saves defaults in ~/.config/audiochapters/config.json; no API key is saved.
+    configure saves defaults in ~/.config/audiorundown/config.json; no API key is saved.
     --open opens the Markdown in your configured editor (otherwise the system default app).
     select accepts the original audio, a transcript folder, or a saved rundown.
     The latest successfully generated/imported rundown is remembered in the transcript folder.

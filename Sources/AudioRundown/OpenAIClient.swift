@@ -58,7 +58,7 @@ struct OpenAIClient {
     init(environment: [String: String] = ProcessInfo.processInfo.environment) throws {
         let value = (environment["OPENAI_API_KEY"] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         guard !value.isEmpty, !value.contains(where: \.isWhitespace) else {
-            throw UserError("Set OPENAI_API_KEY in the shell running audiochapters. Do not pass the key as a command-line argument.")
+            throw UserError("Set OPENAI_API_KEY in the shell running audiorundown. Do not pass the key as a command-line argument.")
         }
         key = value
     }

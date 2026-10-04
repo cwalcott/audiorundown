@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import AudioChapters
+@testable import AudioRundown
 
 @Test func timeParsingAndRounding() throws {
     #expect(try Timecode.parse("90.25") == 90.25)

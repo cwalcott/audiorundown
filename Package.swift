@@ -2,11 +2,11 @@
 import PackageDescription
 
 let package = Package(
-    name: "AudioChapters",
+    name: "AudioRundown",
     platforms: [.macOS("26.0")],
-    products: [.executable(name: "audiochapters", targets: ["AudioChapters"])],
+    products: [.executable(name: "audiorundown", targets: ["AudioRundown"])],
     targets: [
-        .executableTarget(name: "AudioChapters"),
-        .testTarget(name: "AudioChaptersTests", dependencies: ["AudioChapters"])
+        .executableTarget(name: "AudioRundown"),
+        .testTarget(name: "AudioRundownTests", dependencies: ["AudioRundown"])
     ]
 )

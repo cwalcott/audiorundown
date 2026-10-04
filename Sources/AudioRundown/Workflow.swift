@@ -38,7 +38,7 @@ enum Workflow {
                 .filter { fm.fileExists(atPath: $0.appendingPathComponent("rundown.json").path) }
             guard candidates.count == 1 else {
                 throw UserError(candidates.isEmpty
-                    ? "No saved rundown found beside this input. Run audiochapters rundown \(quote(input.path)), or pass the saved rundown directory to select."
+                    ? "No saved rundown found beside this input. Run audiorundown rundown \(quote(input.path)), or pass the saved rundown directory to select."
                     : "Multiple rundowns found. Pass the desired rundown directory to select, or rerun rundown with its model to make it active.")
             }
             selected = candidates[0]
@@ -63,7 +63,7 @@ enum Workflow {
         print("\nSummary: \(markdown.path)")
         let app = settings.editor.map { " -a " + quote($0) } ?? ""
         print("Open: open\(app) \(quote(markdown.path))")
-        print("Choose clips: audiochapters select \(quote(selectionInput.path))")
+        print("Choose clips: audiorundown select \(quote(selectionInput.path))")
         if open {
             do {
                 var arguments = settings.editor.map { ["-a", $0] } ?? []

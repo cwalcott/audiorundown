@@ -37,7 +37,7 @@ enum SummaryContext {
         Suggest sections worth hearing and explain why. Allow me to request greater detail for any section, and choose which sections to export. Do not choose clips on my behalf yet. Once I choose, produce a sections.json clip plan using titles and original start/end times. Include enough context and complete thoughts.
 
         Example plan shape (times are placeholders):
-        {"album":"Selected sections","artist":"AudioChapters","clips":[
+        {"album":"Selected sections","artist":"AudioRundown","clips":[
           {"title":"Descriptive episode title","start":"00:12:34","end":"00:18:05"}
         ]}
 

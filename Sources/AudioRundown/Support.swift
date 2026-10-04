@@ -45,7 +45,7 @@ func withNewDirectory(at destination: URL, body: (URL) async throws -> Void) asy
     try requireNew(destination)
     let fm = FileManager.default
     try fm.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
-    let staging = destination.deletingLastPathComponent().appendingPathComponent(".audiochapters-\(UUID().uuidString)")
+    let staging = destination.deletingLastPathComponent().appendingPathComponent(".audiorundown-\(UUID().uuidString)")
     try fm.createDirectory(at: staging, withIntermediateDirectories: false)
     defer { try? fm.removeItem(at: staging) }
     try await body(staging)

@@ -34,7 +34,7 @@ struct LocalIntelligence {
         case .unavailable(.modelNotReady):
             throw UserError("Apple's language model is not ready. Let its download finish in System Settings → Apple Intelligence & Siri, then retry.")
         case .unavailable:
-            throw UserError("Apple's on-device language model is unavailable on this Mac. Run audiochapters doctor for details.")
+            throw UserError("Apple's on-device language model is unavailable on this Mac. Run audiorundown doctor for details.")
         }
         self.model = model
     }

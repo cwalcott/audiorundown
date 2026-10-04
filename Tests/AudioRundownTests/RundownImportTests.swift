@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import AudioChapters
+@testable import AudioRundown
 
 private let importedMarkdown = """
 # Imported episode

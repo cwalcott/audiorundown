@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import AudioChapters
+@testable import AudioRundown
 
 @Test func preferencesRoundTripAndRejectInvalidCost() throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
