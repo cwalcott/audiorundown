@@ -62,3 +62,31 @@ import Testing
     #expect(Clips.shortened(String(repeating: "🎧", count: 100), limit: 40).count == 40)
     #expect(Workflow.quote("it's $safe") == "'it'\"'\"'s $safe'")
 }
+
+@Test func selectedNamesKeepEpisodeAndCatalogOrderFirst() throws {
+    let clip = ClipPlan.Clip(title: "3f. Watch parties and beach day", start: "00:02:00.000", end: "00:05:00.000")
+    let names = try Clips.selectedNames(clip: clip, episode: "Studio Notes 2026-06-15")
+    #expect(names.file == "Studio Notes 2026-06-15 - 03f - Watch parties and beach day.mp3")
+    #expect(names.title == "Studio Notes 2026-06-15 · 3f · Watch parties and beach day")
+    let nextDay = try Clips.selectedNames(clip: clip, episode: "Studio Notes 2026-06-16")
+    #expect(names.file < nextDay.file)
+    var padded = clip
+    padded.includeRangeInFilename = true
+    #expect(try Clips.selectedNames(clip: padded, episode: "Studio Notes 2026-06-15").file.contains("[00-02-00.000_00-05-00.000]"))
+    let olderPlan = try JSONDecoder().decode(ClipPlan.Clip.self, from: Data(#"{"title":"2. First topic","start":"0","end":"1"}"#.utf8))
+    #expect(try Clips.selectedNames(clip: olderPlan, episode: "Episode").file == "Episode - 02 - First topic.mp3")
+}
+
+@Test func selectedNamesHandleUnsafeAndLongUnicodeTitles() throws {
+    let clip = ClipPlan.Clip(title: "12a. " + String(repeating: "音楽", count: 60), start: "0", end: "1")
+    let episode = "A longer episode title that retains its original date 2026-06-15"
+    let names = try Clips.selectedNames(clip: clip, episode: episode)
+    #expect(names.file.hasPrefix(episode + " - 12a - "))
+    #expect(names.file.utf8.count <= 240)
+    #expect(names.title.hasPrefix(episode + " · 12a · "))
+    let unsafe = try Clips.selectedNames(clip: .init(title: "2. ../../Path: escape", start: "0", end: "1"), episode: "../Show/Name")
+    #expect(!unsafe.file.contains("/"))
+    #expect(!unsafe.file.hasPrefix("."))
+    let custom = try Clips.selectedNames(clip: .init(title: "A custom cut", start: "0", end: "1"), episode: "Episode")
+    #expect(custom.file.contains("[0_1]"))
+}

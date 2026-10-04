@@ -111,13 +111,12 @@ The full story summary is retained in the export record.
     exported = source.with_suffix('.clips') / 'selection-001'
     selected = next(exported.glob('*.mp3'))
     tags = inspect(selected)['format']['tags']
-    assert tags['title'].endswith(' (Test episode 2026-06-02)')
-    assert tags['title'].startswith('1a. The detailed discussion')
-    assert '…' in tags['title'] and len(tags['title']) <= 103
+    assert tags['title'].startswith('Test episode 2026-06-02 · 1a · The detailed discussion')
+    assert '…' in tags['title']
     assert tags['album'] == 'Test episode 2026-06-02'
     assert tags['artist'] == 'Test host' and tags['track'] == '1/1'
-    assert 'Test-episode-2026-06-02' in selected.name
-    assert len(selected.name) <= 88
+    assert selected.name.startswith('Test episode 2026-06-02 - 01a - The detailed discussion')
+    assert len(selected.name.encode('utf-8')) <= 240
     receipt = json.loads((exported / 'export.json').read_text())
     assert receipt['clips'][0]['originalTitle'] == '1a. ' + long_title
     assert receipt['clips'][0]['summary'] == 'The full story summary is retained in the export record.'
@@ -125,6 +124,28 @@ The full story summary is retained in the export record.
     # A second selection uses a new folder, with no overwritten MP3s.
     run(binary, 'select', source, '--request', '1a')
     assert (source.with_suffix('.clips') / 'selection-002').is_dir()
+    assert next((source.with_suffix('.clips') / 'selection-002').glob('*.mp3')).name == selected.name
+
+    # Same selection from a different episode stays distinct in a shared folder.
+    second_source = root / 'second episode.mp3'
+    run(ffmpeg, '-v', 'error', '-i', source, '-c:a', 'copy',
+        '-metadata', 'title=Test episode 2026-06-03', second_source)
+    run(binary, 'select', catalog, '--source', second_source, '--request', '1a')
+    second_clip = next((second_source.with_suffix('.clips') / 'selection-001').glob('*.mp3'))
+    assert second_clip.name.startswith('Test episode 2026-06-03 - 01a - ')
+    shared = root / 'shared'
+    shared.mkdir()
+    shutil.copy2(selected, shared / selected.name)
+    shutil.copy2(second_clip, shared / second_clip.name)
+    assert len(list(shared.glob('*.mp3'))) == 2
+
+    padded_plan = json.loads((exported / 'sections.json').read_text())
+    padded_plan['clips'][0]['includeRangeInFilename'] = True
+    padded_file = root / 'padded.json'
+    padded_file.write_text(json.dumps(padded_plan))
+    run(binary, 'export', source, '--plan', padded_file, '--out-dir', root / 'padded')
+    padded_clip = next((root / 'padded').glob('*.mp3'))
+    assert '[00-00-02.000_00-00-04.000]' in padded_clip.name
 
     # Untagged sources fall back to their filename; hand-written plans remain compatible.
     untagged = root / 'Untagged episode.mp3'
@@ -132,7 +153,7 @@ The full story summary is retained in the export record.
     run(binary, 'select', catalog, '--source', untagged, '--request', '1a')
     fallback = next((untagged.with_suffix('.clips') / 'selection-001').glob('*.mp3'))
     fallback_tags = inspect(fallback)['format']['tags']
-    assert fallback_tags['title'].endswith(' (Untagged episode)')
+    assert fallback_tags['title'].startswith('Untagged episode · 1a · ')
     assert fallback_tags['album'] == 'Untagged episode' and fallback_tags['artist'] == 'AudioRundown'
 
     run(binary, 'configure', '--model', 'openai:gpt-6.1-sol', '--editor', 'Visual Studio Code')

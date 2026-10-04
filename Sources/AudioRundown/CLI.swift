@@ -169,6 +169,7 @@ struct AudioRundown {
     Exact IDs need no model. Use select --model to choose a different local selector.
     Default rundown: INPUT.transcript/rundown/{rundown.md,rundown.json}.
     Default selections: INPUT.clips/selection-001/ (then 002, 003…).
+    Selected filenames: Episode title - 03c - Clip title.mp3; padded cuts include their range.
     Audio decoding and MP3 export require FFmpeg. Upload exported MP3s to Overcast manually.
     """
 }

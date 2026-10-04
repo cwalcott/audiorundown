@@ -11,6 +11,7 @@ struct ClipPlan: Codable {
         let start: String
         let end: String
         var summary: String? = nil
+        var includeRangeInFilename: Bool? = nil
     }
 }
 
@@ -31,6 +32,39 @@ struct ExportReceipt: Codable {
 }
 
 enum Clips {
+    /// Keep episode identity and catalog order visible when exports share a folder.
+    static func selectedNames(clip: ClipPlan.Clip, episode: String) throws -> (title: String, file: String) {
+        let parts = clip.title.components(separatedBy: ". ")
+        let id = parts[0]
+        let hasID = parts.count > 1 && id.range(of: "^[1-9][0-9]*[a-z]*$", options: .regularExpression) != nil
+        let description = hasID ? parts.dropFirst().joined(separator: ". ") : clip.title
+        let episodeTitle = episode.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+        let title = ([episodeTitle] + (hasID ? [id] : []) + [shortened(description, limit: 60)]).joined(separator: " · ")
+        let number = String(id.prefix(while: { $0.isNumber }))
+        let paddedID = hasID ? String(repeating: "0", count: max(0, 2 - number.count)) + id : ""
+        // Padded variants retain their source ranges, so separate exports can coexist.
+        let range = " [\(clip.start.replacingOccurrences(of: ":", with: "-"))_\(clip.end.replacingOccurrences(of: ":", with: "-"))]"
+        let suffix = (clip.includeRangeInFilename == true || !hasID) ? range : ""
+        let prefix = filenameComponent(episodeTitle) + (hasID ? " - \(paddedID)" : "") + " - "
+        for limit in stride(from: 60, through: 1, by: -1) {
+            let filename = prefix + filenameComponent(shortened(description, limit: limit)) + filenameComponentSuffix(suffix) + ".mp3"
+            if filename.utf8.count <= 240 { return (title, filename) }
+        }
+        throw UserError("The episode title is too long for an MP3 filename. Shorten the source title tag before exporting.")
+    }
+
+    static func filenameComponent(_ text: String) -> String {
+        let forbidden = CharacterSet(charactersIn: "/\\:*?\"<>|").union(.controlCharacters)
+        let clean = text.components(separatedBy: forbidden).joined(separator: " ")
+            .split(whereSeparator: \.isWhitespace).joined(separator: " ")
+            .trimmingCharacters(in: CharacterSet(charactersIn: ". "))
+        return clean.isEmpty ? "clip" : clean
+    }
+
+    private static func filenameComponentSuffix(_ suffix: String) -> String {
+        suffix.isEmpty ? "" : " " + filenameComponent(suffix)
+    }
+
     static func shortened(_ text: String, limit: Int) -> String {
         let clean = text.split(whereSeparator: \.isWhitespace).joined(separator: " ")
         guard clean.count > limit else { return clean }
@@ -161,11 +195,14 @@ enum Clips {
         let artist = episode?.artist ?? plan.artist ?? "AudioRundown"
         try await withNewDirectory(at: destination) { staging in
             var entries: [ExportReceipt.Entry] = []
+            var filenames: Set<String> = []
             for (index, clip) in plan.clips.enumerated() {
-                let title = episode.map { shortened(clip.title, limit: 60) + " (" + shortened($0.title, limit: 40) + ")" } ?? clip.title
-                // Keep room for both clip and episode in the filename as well as the ID3 title.
-                let fileTitle = episode.map { shortened(clip.title, limit: 44) + " " + shortened($0.title, limit: 30) } ?? clip.title
-                let filename = String(format: "%03d", index + 1) + "-" + safeFilename(fileTitle) + ".mp3"
+                let names = try episode.map { try selectedNames(clip: clip, episode: $0.title) }
+                let title = names?.title ?? clip.title
+                let filename = names?.file ?? String(format: "%03d", index + 1) + "-" + safeFilename(clip.title) + ".mp3"
+                guard filenames.insert(filename.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: Locale(identifier: "en-US"))).inserted else {
+                    throw UserError("The selection contains duplicate filenames. Export those versions separately.")
+                }
                 log("Exporting \(index + 1)/\(plan.clips.count): \(clip.title)")
                 try encode(source: source, output: staging.appendingPathComponent(filename), range: ranges[index],
                            title: title, album: album, artist: artist, track: "\(index + 1)/\(plan.clips.count)")

@@ -58,7 +58,7 @@ Downloads/
       rundown.md, rundown.json, model-draft.json, api-usage.json
   recording.clips/
     selection-001/
-      001-clip-title-episode-title.mp3
+      Episode title - 03c - Clip title.mp3
       export.json, sections.json
     selection-002/
       ...
@@ -76,7 +76,9 @@ Export the whole interview segment with 10 seconds before it
 
 IDs export immediately without a model. Descriptions use a local model and may ask for clarification. `list` shows the available IDs, `show 3b` reads an item's summary, and `quit` exits. Selecting a parent and its child exports the parent once. Start with `select ... --preview` to inspect choices without exporting. Selection chooses existing catalog entries; use `clip` below for arbitrary time ranges.
 
-Each selected MP3 gets a title like **“3c. Choosing a microphone (Studio Notes, Episode 12)”**. The episode name comes from the source's title tag, falling back to its filename. Long clip and episode names are shortened at word boundaries (60 and 40 characters respectively); filenames use shorter versions. The album tag keeps the full episode title, the artist comes from the source when present, and track numbers preserve export order. The export records retain the full clip title, summary, and original time range. Explicit titles in the manual `clip` and `export` commands are preserved.
+Selected filenames put the episode first: `Studio Notes 2026-06-15 - 03c - Choosing a microphone.mp3`. The MP3 title is **“Studio Notes 2026-06-15 · 3c · Choosing a microphone”**. The episode comes from the source's title tag, falling back to its filename. Filenames use the rundown ID, with at least two digits, instead of a counter that restarts with each batch. This groups clips by episode and catalog order when they share a folder.
+
+Only the descriptive clip title is shortened, at word boundaries up to 60 characters; filenames shorten it further if needed for filesystem limits and replace unsafe path characters. The episode name and ID remain visible. Padded selections add their source time range to the filename to distinguish versions. Repeating an identical selection gives the same filename in a new selection folder. The album tag keeps the full episode title, the artist comes from the source when present, and track numbers preserve export order. Export records retain the full clip title, summary, and original time range. Explicit titles in manual `clip` and ordinary `export` plans are preserved.
 
 Upload the desired MP3s to Overcast manually. Each exported MP3 is self-contained, so you can delete the source and generated folders once you no longer need them. Keeping the transcript folder lets you reuse the transcript and cached summaries; further clip exports still need the original audio.
 

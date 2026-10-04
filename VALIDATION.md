@@ -10,11 +10,11 @@ swift build -c release
 python3 scripts/test_exports.py .build/release/audiorundown
 ```
 
-The latest verification on October 4, 2026 passed all 30 Swift tests, the release build, and the FFmpeg integration checks on Apple silicon with macOS 27.0.1 and Swift 6.4 / Xcode 27.
+The latest verification on October 4, 2026 passed all 32 Swift tests, the release build, and the FFmpeg integration checks on Apple silicon with macOS 27.0.1 and Swift 6.4 / Xcode 27.
 
 The Swift tests cover time parsing, validated model boundaries, stable IDs, parent/child selection, padding, imported Markdown, source-time preservation, saved preferences, rundown discovery, and safe output handling. Synthetic API responses exercise refusal and incomplete-output handling, cost accounting, and local cache reuse without credentials or paid requests.
 
-The integration script creates temporary audio with three distinct tones. It checks the actual audio content of a cut, MP3 codec and duration, metadata, shortened titles, source-tag fallbacks, successive export folders, overwrite rejection, and invalid ranges. It also exercises importing a rundown and selecting clips using the original MP3 path. Temporary fixtures are removed after the run.
+The integration script creates temporary audio with three distinct tones. It checks the actual audio content of a cut, MP3 codec and duration, metadata, shortened titles, source-tag fallbacks, successive export folders, overwrite rejection, and invalid ranges. It also exercises importing a rundown and selecting clips using the original MP3 path. Filename checks cover episode-first ordering, stable catalog IDs across batches, different episodes in a shared folder, and time-range suffixes for padded versions. Temporary fixtures are removed after the run.
 
 These checks do not download speech assets, run live summary models, or make paid API requests. They verify software behavior, not transcription or summary accuracy.
 
