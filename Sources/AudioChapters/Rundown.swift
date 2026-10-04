@@ -8,6 +8,7 @@ struct Rundown: Codable {
     let duration: Double
     let createdAt: Date
     var engine = "Apple SystemLanguageModel (on device)"
+    var origin: String? = nil
     let segments: [Segment]
 
     struct Segment: Codable {
@@ -33,8 +34,8 @@ struct Rundown: Codable {
     }
 
     var markdown: String {
-        let provenance = schemaVersion == 2 ? "Imported from \(Self.prose(engine))" : "Generated locally with \(Self.prose(engine))"
-        let note = schemaVersion == 2 ? "Imported timestamps are preserved; gaps between selections are allowed." : "Experimental draft: check names, claims, and clip boundaries against the audio. Topic grouping can fall back to approximate vocabulary-based boundaries."
+        let provenance = origin == "openai" ? "Generated with \(Self.prose(engine)) via API" : schemaVersion == 2 ? "Imported from \(Self.prose(engine))" : "Generated locally with \(Self.prose(engine))"
+        let note = origin == "openai" ? "Draft listening guide; boundaries use original transcript entries. Check claims and listening boundaries against the audio." : schemaVersion == 2 ? "Imported timestamps are preserved; gaps between selections are allowed." : "Experimental draft: check names, claims, and clip boundaries against the audio. Topic grouping can fall back to approximate vocabulary-based boundaries."
         var lines = ["# \(Self.prose(title))", "", "\(Self.durationLabel(duration)) · \(provenance)", "", note, "",
                      "Times refer to the original recording. Select a whole segment (1) or an individual clip (1a).", ""]
         for segment in segments {

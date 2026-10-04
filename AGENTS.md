@@ -21,7 +21,8 @@ Prefer simple defaults and an interactive selection workflow. Rundowns should ha
 - `Transcription.swift`: Apple Speech transcription and transcript outputs.
 - `RundownGenerator.swift`, `TopicGrouping.swift`: local summary generation and topic grouping.
 - `Rundown.swift`, `RundownImport.swift`: saved catalog, validation, Markdown rendering and import.
-- `LocalIntelligence.swift`, `OllamaClient.swift`: model backends and structured generation.
+- `LocalIntelligence.swift`, `OllamaClient.swift`: local model backends and structured generation.
+- `OpenAIClient.swift`, `OpenAIRundown.swift`: explicit API transport, full-transcript generation, usage/cost estimates, and response caching.
 - `Selection.swift`: interactive requests, catalog IDs, and export plans.
 - `Clips.swift`, `Support.swift`: audio export, timecodes, subprocesses, and atomic outputs.
 - `Tests/AudioChaptersTests/`: Swift Testing tests; `scripts/test_exports.py`: FFmpeg integration checks.
@@ -32,10 +33,10 @@ Paths in this code map after the first entry are relative to `Sources/AudioChapt
 
 - All times refer to the original decoded recording. MP3 container duration can be wrong; preserve PCM normalization for transcription and decoded-duration/accurate-seeking behavior for export.
 - Model responses are untrusted data. Validate IDs, finite time ranges, ordering, containment, and padding before export. Exact-ID selection must remain independent of model availability.
-- Generated schema-1 rundowns require complete coverage. Imported schema-2 rundowns allow gaps but require ordered, nonoverlapping segments and clips within their parent. Preserve imported timestamps rather than filling gaps or shifting boundaries.
-- Preserve stable saved IDs and truthful model provenance. Importing a rundown does not call its authoring model. Imported catalogs default to Apple for descriptive selection; `--model` can override the selector.
+- Generated schema-1 rundowns require complete coverage. Imported and API schema-2 rundowns allow gaps but require ordered, nonoverlapping segments and clips within their parent. API drafts must cover all transcript entries; timestamps are derived from validated entry indices. Preserve imported timestamps rather than filling gaps or shifting boundaries.
+- Preserve stable saved IDs and truthful model provenance. Importing a rundown does not call its authoring model. Imported and API catalogs default to Apple for descriptive selection; `--model` can override the selector.
 - Keep existing outputs intact and publish new output directories atomically. Pass subprocess arguments directly, without shell evaluation.
-- Current inference backends are local. Preserve explicit backend selection, loopback-only Ollama transport, and the absence of silent cloud fallback or automatic model downloads. A future API backend should be explicit and keep credentials out of source and logs.
+- Preserve explicit backend selection, loopback-only Ollama transport, and the absence of silent cloud fallback or automatic model downloads. Only `--model openai:gpt-6.1-sol` sends transcript text to OpenAI; audio and selection stay local. Keep API keys out of source, arguments, logs, and saved responses. Preserve no-redirect transport, preflight cost checks, and local response reuse without automatic paid retries. Tests use synthetic responses; live API calls are not routine regression checks.
 - Structural validation does not establish summary accuracy. Evaluate speaker attribution, jokes versus factual claims, music versus conversation, topic coverage, and useful listening boundaries separately. Record experimental findings without turning a single episode into a general model ranking.
 
 ## Repository hygiene

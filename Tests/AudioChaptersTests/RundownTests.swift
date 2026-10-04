@@ -88,3 +88,16 @@ private func fixture() -> Rundown {
     let intent = ClipIntent(hasClearMatch: false, ids: ["1"], beforeSeconds: 0, afterSeconds: 0)
     #expect(throws: UserError.self) { try Selection.plan(intent.selection, rundown: fixture()) }
 }
+
+
+@Test func explicitPaddingPreservesRequestedDirection() throws {
+    let after = try #require(try Selection.explicitPadding("Export the performance with 10 seconds after it"))
+    #expect(after.before == 0)
+    #expect(after.after == 10)
+    let both = try #require(try Selection.explicitPadding("10 seconds before and 2.5 secs after"))
+    #expect(both.before == 10)
+    #expect(both.after == 2.5)
+    #expect(try Selection.explicitPadding("Export the guitar discussion") == nil)
+    #expect(throws: UserError.self) { try Selection.explicitPadding("-10 seconds after") }
+    #expect(throws: UserError.self) { try Selection.explicitPadding("10 seconds after and 5 seconds after") }
+}

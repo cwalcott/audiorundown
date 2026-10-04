@@ -19,6 +19,7 @@ struct LocalIntelligence {
     }
 
     init(modelName: String = "apple") async throws {
+        if modelName.hasPrefix("openai:") { throw UserError("OpenAI is supported for rundown generation only. Use apple, an Ollama model, or exact IDs for clip selection.") }
         if modelName != "apple" {
             self.ollama = try await OllamaClient.connect(modelName: modelName)
             self.model = nil

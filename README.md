@@ -2,7 +2,7 @@
 
 Turn a long recording into a readable rundown, then export selected sections as individual MP3 episodes for Overcast.
 
-Transcription uses Apple's **SpeechAnalyzer / SpeechTranscriber**. Summaries and natural-language clip selection can use **a local Ollama model** or the **Foundation Models framework's on-device Apple Intelligence model**. Audio decoding and MP3 export use FFmpeg. No cloud fallback, API keys, or Swift package dependencies.
+Transcription uses Apple's **SpeechAnalyzer / SpeechTranscriber**. Rundowns can use **OpenAI Sol via API**, **local Ollama**, or the **Foundation Models framework's on-device Apple Intelligence model**. Clip selection and FFmpeg audio export stay local. OpenAI is an explicit option requiring an API key and separate billing; local backends need no key. There is no automatic cloud fallback or third-party Swift package dependency.
 
 ## Everyday workflow
 
@@ -29,6 +29,35 @@ Export the whole Letterman segment with 10 seconds before it
 These descriptions are examples; available topics depend on the recording. The tool prints the selected titles and times, then exports each selection as an MP3. If a request is ambiguous, it asks a follow-up question. Use `list` to see the IDs, `show 3b` to read an item's summary, or `quit` to exit. Selecting a parent segment and one of its children exports the parent once.
 
 Exports go beside the audio in `recording.clips/selection-001/`, then `selection-002/`, and so on. Upload the MP3s through your Overcast upload workflow. Uploading is still manual.
+
+### Generate a full-episode rundown with Sol
+
+Set `OPENAI_API_KEY` in the shell that runs the command. If you already exported it in `~/.zshrc`, run `source ~/.zshrc`. Keep the key out of the repository, command-line arguments, logs, and chat. The API project needs Responses access and API billing/model access.
+
+```sh
+.build/release/audiochapters rundown "/path/to/recording.mp3" \
+  --model openai:gpt-6.1-sol --interactive
+```
+
+You can pass an existing transcript folder or `transcript.json` to reuse transcription. This sends the **entire timestamped transcript text** to OpenAI in one generation request, using medium reasoning and structured output. The model chooses original transcript entry boundaries; the utility validates complete entry coverage, derives times and IDs, and saves a selectable rundown. Audio is not uploaded. Brief gaps between speech entries are preserved. This uses the same editorial goals as the Codex test, with structured entry references instead of Markdown timestamps; identical output is not guaranteed.
+
+Default output is `recording.transcript/rundown-openai/`, containing `rundown.md`, `rundown.json`, `model-draft.json`, and `api-usage.json`. Open the selector later with:
+
+```sh
+.build/release/audiochapters select "/path/to/recording.transcript/rundown-openai"
+```
+
+Selection defaults to Apple's local model; exact IDs require neither a model nor the API key. Use `select --model gemma4:31b` to select by description with local Ollama instead. API generation is currently supported only for `openai:gpt-6.1-sol`.
+
+Optional API settings:
+
+- `--reasoning low|medium|high|xhigh|max` (default `medium`).
+- `--max-cost 1.00` (default): before generation, the API counts input tokens and the utility compares a conservative estimated maximum with this USD amount. Counting sends the transcript even if generation is blocked. The estimate assumes standard Sol prices checked October 4, 2026, up to 25,000 output tokens including reasoning, and cache-write pricing for all input. It is not a billing guarantee and excludes taxes or account-specific charges. The API path currently accepts at most 250,000 input tokens to stay within short-context pricing.
+- `--out-dir DIR` for a different destination. Finished outputs are reused only when transcript, model, prompt, and reasoning settings match.
+
+Actual token usage and an estimated cost are printed and saved in `api-usage.json`. Output-token usage includes reasoning, and cache-read/write counts are used when reported. Check the OpenAI billing dashboard for the final charge. Responses use `store: false`; this does not promise zero server-side retention under every account policy.
+
+API responses are cached locally in `.openai-rundown-cache` inside the transcript folder before validation. Repeating the same request reuses its response even with a new output destination, preventing duplicate charges. Incomplete or invalid answers are retained but never published as finished rundowns. There are no automatic paid retries. An interrupted connection may still have incurred usage; check the dashboard before retrying. A leftover `.lock` directory blocks concurrent generation: remove only that indicated lock after confirming no process is still using it. Do not clear the response cache merely to rerun an unchanged request.
 
 ### Use a rundown from Codex or ChatGPT
 
@@ -81,7 +110,7 @@ For a single request, or to check the selection before exporting:
   --request "Export the guitar discussion with 10 seconds before it"
 ```
 
-`--preview` creates no files. `--out-dir DIR` chooses a new export folder; `--source AUDIO` locates the original if you moved it. Exact IDs require no language model. For descriptions, `select` automatically uses the model saved with the rundown; `--model NAME` overrides it. Natural-language selection uses only the saved catalog, so use the existing `clip` command below for custom time ranges or finer cuts.
+`--preview` creates no files. `--out-dir DIR` chooses a new export folder; `--source AUDIO` locates the original if you moved it. Exact IDs require no language model. Explicit numeric padding such as `10 seconds before` or `10 seconds after` is applied by code to preserve the requested direction. For descriptions, `select` automatically uses the model saved with the rundown; `--model NAME` overrides it. Natural-language selection uses only the saved catalog, so use the existing `clip` command below for custom time ranges or finer cuts.
 
 `rundown --out-dir DIR` changes the rundown destination; its transcript still uses the normal adjacent folder. To choose a different transcript location, run `transcribe --out-dir DIR` first and pass that folder to `rundown`. Intermediate model results are cached in the transcript's `.rundown-cache` folder, so rerunning after an interruption reuses completed analysis. Caches are separate for each backend and Ollama model digest. A finished rundown is reused without changing its IDs; choose a new rundown destination to regenerate it or compare models:
 
@@ -91,7 +120,7 @@ For a single request, or to check the selection before exporting:
 .build/release/audiochapters select "work/qwen-rundown"
 ```
 
-The local rundown is experimental. If the selected model returns an invalid topic plan or declines structured generation, the tool reports that and uses vocabulary changes between notes to place approximate boundaries; the selected model still writes the summaries and fallback titles. The model summarizes roughly two- to three-minute transcript pieces, groups them, then writes the finished summaries. Clip boundaries currently fall on those piece boundaries, so they can include neighboring material or miss the beginning of a story. Use `clip` for precise cuts. Our Apple-model Stern tests also found missed topics, incorrect attribution, and jokes described as facts; this is a draft listening guide, not a verified account. Check selections with `--preview`, and use padding when a story needs more context. The Qwen comparison produced more reliable structured output but still had incorrect speaker attribution and imperfect grouping. On our M3 Max test, this roughly three-hour episode took about 21 minutes with `qwen3.6:27b`; other recordings and machines will differ. All audio and transcript processing by these commands stays on your Mac.
+The local rundown is experimental. If the selected model returns an invalid topic plan or declines structured generation, the tool reports that and uses vocabulary changes between notes to place approximate boundaries; the selected model still writes the summaries and fallback titles. The model summarizes roughly two- to three-minute transcript pieces, groups them, then writes the finished summaries. Clip boundaries currently fall on those piece boundaries, so they can include neighboring material or miss the beginning of a story. Use `clip` for precise cuts. Our Apple-model Stern tests also found missed topics, incorrect attribution, and jokes described as facts; this is a draft listening guide, not a verified account. Check selections with `--preview`, and use padding when a story needs more context. The Qwen comparison produced more reliable structured output but still had incorrect speaker attribution and imperfect grouping. On our M3 Max test, this roughly three-hour episode took about 21 minutes with `qwen3.6:27b`; other recordings and machines will differ. Processing with the Apple and Ollama backends stays on your Mac. The explicitly selected OpenAI backend sends transcript text to the API.
 
 ## One-time setup
 
@@ -107,7 +136,7 @@ swift build -c release
 .build/release/audiochapters doctor
 ```
 
-For Ollama, install a model once if needed with `ollama pull qwen3.6:27b`, then start the Ollama app or `ollama serve`. AudioChapters connects only to `127.0.0.1:11434`; it does not download models, use Ollama cloud models, or fall back to another provider. It currently requests a 32K context window with thinking disabled. Long recordings are processed in pieces, so the full transcript does not need to fit in that window. Transcription still uses Apple’s Speech framework regardless of the summary model.
+For Ollama, install a model once if needed with `ollama pull qwen3.6:27b`, then start the Ollama app or `ollama serve`. AudioChapters connects only to `127.0.0.1:11434`; it does not download models, use Ollama cloud models, or fall back to another provider. The Ollama backend currently requests a 32K context window with thinking disabled. Long recordings are processed in pieces, so the full transcript does not need to fit in that window. Transcription still uses Apple’s Speech framework regardless of the summary model.
 
 Rebuild after updating the source. You can also add `.build/release` to your PATH to use `audiochapters` directly, or use `swift run -c release audiochapters …`.
 

@@ -4,3 +4,9 @@
 work/
 *.transcript/
 *.clips/
+
+# Local API credentials and generated API artifacts
+.env
+.env.*
+*.rundown/
+.openai-rundown-cache/

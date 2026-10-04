@@ -32,6 +32,27 @@ enum Selection {
         return tokens
     }
 
+    /// Preserve explicit numeric before/after padding even if a model swaps it.
+    static func explicitPadding(_ request: String) throws -> (before: Double, after: Double)? {
+        let pattern = #"(?<![\w.])(-?[0-9]+(?:\.[0-9]+)?)\s*(?:seconds?|secs?|s)\s+(before|after)\b"#
+        let regex = try NSRegularExpression(pattern: pattern, options: .caseInsensitive)
+        let text = request as NSString
+        let matches = regex.matches(in: request, range: NSRange(location: 0, length: text.length))
+        guard !matches.isEmpty else { return nil }
+        var values: [String: Double] = [:]
+        for match in matches {
+            let direction = text.substring(with: match.range(at: 2)).lowercased()
+            guard let seconds = Double(text.substring(with: match.range(at: 1))), seconds.isFinite, seconds >= 0 else {
+                throw UserError("Padding must be a nonnegative number of seconds.")
+            }
+            guard values[direction] == nil || values[direction] == seconds else {
+                throw UserError("Give one padding amount before and one after the selected clips.")
+            }
+            values[direction] = seconds
+        }
+        return (values["before"] ?? 0, values["after"] ?? 0)
+    }
+
     static func validate(_ response: SelectionResponse, rundown: Rundown) throws {
         guard response.beforeSeconds.isFinite, response.afterSeconds.isFinite,
               response.beforeSeconds >= 0, response.afterSeconds >= 0,
@@ -103,6 +124,11 @@ enum Selection {
             if try await model.fits(prompt, instructions: instructions, outputTokens: 600) {
                 let intent: ClipIntent = try await model.json(instructions: instructions, prompt: prompt, outputTokens: 600) {
                     try validate($0.selection, rundown: rundown)
+                }
+                if let padding = try explicitPadding(request) {
+                    let corrected = SelectionResponse(ids: intent.ids, beforeSeconds: padding.before, afterSeconds: padding.after, clarification: intent.selection.clarification)
+                    try validate(corrected, rundown: rundown)
+                    return corrected
                 }
                 return intent.selection
             }
