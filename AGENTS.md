@@ -2,7 +2,7 @@
 
 ## Purpose and workflow
 
-AudioRundown is a Swift command-line utility for transcribing long recordings, creating readable episode rundowns, and exporting selected sections as MP3s for listening or manual upload to Overcast. Read `README.md` for commands and `VALIDATION.md` for measured results and known limitations.
+AudioRundown is a Swift command-line utility for transcribing long recordings, creating readable episode rundowns, and exporting selected sections as MP3s for listening or manual upload to Overcast. Read `README.md` for commands and `VALIDATION.md` for verification coverage and known limitations.
 
 Prefer simple defaults and an interactive selection workflow. Rundowns should have roughly five main segments, usually no more than ten, but follow the recording's topics rather than enforcing a fixed count. Each numbered segment has a short Summary followed by a Detailed rundown of lettered clips. Keep Markdown easy to skim.
 
@@ -42,6 +42,6 @@ Paths in this code map after the first entry are relative to `Sources/AudioRundo
 
 ## Repository hygiene
 
-Keep recordings, transcripts, model caches, generated rundowns, and exported clips out of commits. Use ignored `work/`, `*.transcript/`, or `*.clips/` directories for local artifacts; use synthetic fixtures in tests. Do not depend on a particular user's Downloads paths in production code or tests.
+Keep recordings, transcripts, model caches, generated rundowns, and exported clips out of commits. Use ignored `work/`, `*.transcript/`, or `*.clips/` directories for local artifacts and synthetic fixtures in tests. Keep paths portable in code, tests, and documentation. Public documentation should use generic examples rather than personal paths, private recording details, transcript excerpts, or experiment logs.
 
-Update CLI help and `README.md` when commands or defaults change. Add material experiment results to `VALIDATION.md`, distinguishing software checks from content-quality judgments. Keep this file focused on durable project guidance rather than session history.
+Update CLI help and `README.md` when commands or defaults change. Keep `VALIDATION.md` focused on reproducible checks and general limitations, distinguishing software checks from content-quality judgments. Keep this file focused on durable project guidance rather than session history.

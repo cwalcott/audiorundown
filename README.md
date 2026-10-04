@@ -1,8 +1,37 @@
 # AudioRundown
 
-Turn a long recording into a readable rundown, then export selected sections as individual MP3 episodes for Overcast.
+A macOS command-line tool that turns long recordings into readable Markdown rundowns and selected MP3 clips for listening or manual upload to Overcast.
 
 Transcription uses Apple's **SpeechAnalyzer / SpeechTranscriber**. Rundowns can use **OpenAI Sol via API**, **local Ollama**, or the **Foundation Models framework's on-device Apple Intelligence model**. Clip selection and FFmpeg audio export stay local. OpenAI is an explicit option requiring an API key and separate billing; local backends need no key. There is no automatic cloud fallback or third-party Swift package dependency.
+
+## One-time setup
+
+- Apple silicon Mac, macOS 26 or later, with a supported speech language.
+- Xcode 27 or later to build this version (it uses the current Foundation Models SDK).
+- For `--model apple`: Apple Intelligence enabled and its on-device model ready. `doctor` reports Apple model availability.
+- For `--model qwen3.6:27b` (or another Ollama model): Ollama running locally with that model already installed. Apple Intelligence is not required for Ollama summarization or selection.
+- FFmpeg for audio decoding and MP3 export: `brew install ffmpeg` if needed.
+
+Clone or download the repository, then build and install from its directory:
+
+```sh
+cd /path/to/audiorundown
+swift build -c release
+mkdir -p ~/.bin
+cp .build/release/audiorundown ~/.bin/audiorundown
+export PATH="$HOME/.bin:$PATH"
+audiorundown doctor
+
+# Optional: save Sol as your default (requires an API key and billing):
+audiorundown configure --model openai:gpt-6.1-sol \
+  --reasoning medium --max-cost 1.00 --editor "Visual Studio Code"
+```
+
+For local summarization, use `--model apple` or choose an installed Ollama model. To save a local default, run `audiorundown configure --model apple` or `audiorundown configure --model MODEL_NAME`. For Ollama, install a model once if needed with `ollama pull qwen3.6:27b`, then start the Ollama app or `ollama serve`. AudioRundown connects only to `127.0.0.1:11434`; it does not download models, use Ollama cloud models, or fall back to another provider. The Ollama backend currently requests a 32K context window with thinking disabled. Long recordings are processed in pieces, so the full transcript does not need to fit in that window. Transcription still uses Apple’s Speech framework regardless of the summary model.
+
+Add `export PATH="$HOME/.bin:$PATH"` to your shell configuration if `~/.bin` is not already on your `PATH`. Rebuild and copy the executable again after source updates.
+
+`configure` saves preferences in `~/.config/audiorundown/config.json`. Run it without options to inspect them. It never saves the API key. Command flags override preferences; `--model apple` or an installed Ollama model uses local summarization even when Sol is saved. A fresh installation without preferences defaults to Apple. The saved summary model does not change the local selection model. `--editor` takes a macOS application name; without it, `--open` uses the system's default Markdown app. `AUDIORUNDOWN_CONFIG` can override the config path for isolated environments.
 
 ## Everyday workflow
 
@@ -16,7 +45,7 @@ audiorundown select "$HOME/Downloads/recording.mp3"
 
 `rundown` transcribes if needed, then summarizes with your saved model preference. It prints the exact Markdown path and a copyable command for choosing clips. `--open` opens the Markdown in your configured app; omit it to open the printed path yourself. Add `--interactive` to start choosing clips immediately after generation.
 
-Defaults are `en-US` and folders beside the source audio. With the Sol preferences below, the files are:
+Defaults are `en-US` and folders beside the source audio. With Sol selected, the files are:
 
 ```text
 Downloads/
@@ -41,13 +70,13 @@ At the selection prompt, enter IDs or describe what you want:
 
 ```text
 1, 3b
-Export the Sharon Stone story and the Ralph billing story
-Export the whole Letterman segment with 10 seconds before it
+Export the equipment discussion and the travel tips
+Export the whole interview segment with 10 seconds before it
 ```
 
 IDs export immediately without a model. Descriptions use a local model and may ask for clarification. `list` shows the available IDs, `show 3b` reads an item's summary, and `quit` exits. Selecting a parent and its child exports the parent once. Start with `select ... --preview` to inspect choices without exporting. Selection chooses existing catalog entries; use `clip` below for arbitrary time ranges.
 
-Each selected MP3 gets a title like **“3c. Letterman entrances (THSS 2026-06-02)”**. The episode name comes from the source's title tag, falling back to its filename. Long clip and episode names are shortened at word boundaries (60 and 40 characters respectively); filenames use shorter versions. The album tag keeps the full episode title, the artist comes from the source when present, and track numbers preserve export order. The export records retain the full clip title, summary, and original time range. Explicit titles in the manual `clip` and `export` commands are preserved.
+Each selected MP3 gets a title like **“3c. Choosing a microphone (Studio Notes, Episode 12)”**. The episode name comes from the source's title tag, falling back to its filename. Long clip and episode names are shortened at word boundaries (60 and 40 characters respectively); filenames use shorter versions. The album tag keeps the full episode title, the artist comes from the source when present, and track numbers preserve export order. The export records retain the full clip title, summary, and original time range. Explicit titles in the manual `clip` and `export` commands are preserved.
 
 Upload the desired MP3s to Overcast manually. Each exported MP3 is self-contained, so you can delete the source and generated folders once you no longer need them. Keeping the transcript folder lets you reuse the transcript and cached summaries; further clip exports still need the original audio.
 
@@ -62,7 +91,7 @@ audiorundown rundown "/path/to/recording.mp3" \
   --model openai:gpt-6.1-sol --interactive
 ```
 
-You can pass an existing transcript folder or `transcript.json` to reuse transcription. This sends the **entire timestamped transcript text** to OpenAI in one generation request, using medium reasoning and structured output. The model chooses original transcript entry boundaries; the utility validates complete entry coverage, derives times and IDs, and saves a selectable rundown. Audio is not uploaded. Brief gaps between speech entries are preserved. This uses the same editorial goals as the Codex test, with structured entry references instead of Markdown timestamps; identical output is not guaranteed.
+You can pass an existing transcript folder or `transcript.json` to reuse transcription. This sends the **entire timestamped transcript text** to OpenAI in one generation request, using medium reasoning and structured output. The model chooses original transcript entry boundaries; the utility validates complete entry coverage, derives times and IDs, and saves a selectable rundown. Audio is not uploaded. Brief gaps between speech entries are preserved.
 
 Default output is `recording.transcript/rundown-openai/`, containing `rundown.md`, `rundown.json`, `model-draft.json`, and `api-usage.json`. Open the selector later with:
 
@@ -133,7 +162,7 @@ audiorundown select "/path/to/recording.transcript/rundown" \
   --request "Export the guitar discussion with 10 seconds before it"
 ```
 
-`--preview` creates no files. `--out-dir DIR` chooses a new export folder; `--source AUDIO` locates the original if you moved it. Exact IDs require no language model. Explicit numeric padding such as `10 seconds before` or `10 seconds after` is applied by code to preserve the requested direction. For descriptions, `select` automatically uses the model saved with the rundown; `--model NAME` overrides it. Natural-language selection uses only the saved catalog, so use the existing `clip` command below for custom time ranges or finer cuts.
+`--preview` creates no files. `--out-dir DIR` chooses a new export folder; `--source AUDIO` locates the original if you moved it. Exact IDs require no language model. Explicit numeric padding such as `10 seconds before` or `10 seconds after` is applied by code to preserve the requested direction. For descriptions, `select` uses the saved local model, or Apple for imported/API rundowns; `--model NAME` overrides it. Natural-language selection uses only the saved catalog, so use the existing `clip` command below for custom time ranges or finer cuts.
 
 `rundown --out-dir DIR` changes the rundown destination; its transcript still uses the normal adjacent folder. To choose a different transcript location, run `transcribe --out-dir DIR` first and pass that folder to `rundown`. Intermediate model results are cached in the transcript's `.rundown-cache` folder, so rerunning after an interruption reuses completed analysis. Caches are separate for each backend and Ollama model digest. A finished rundown is reused without changing its IDs; choose a new rundown destination to regenerate it or compare models:
 
@@ -143,33 +172,7 @@ audiorundown rundown "/path/to/recording.transcript" \
 audiorundown select "work/qwen-rundown"
 ```
 
-The local rundown is experimental. If the selected model returns an invalid topic plan or declines structured generation, the tool reports that and uses vocabulary changes between notes to place approximate boundaries; the selected model still writes the summaries and fallback titles. The model summarizes roughly two- to three-minute transcript pieces, groups them, then writes the finished summaries. Clip boundaries currently fall on those piece boundaries, so they can include neighboring material or miss the beginning of a story. Use `clip` for precise cuts. Our Apple-model Stern tests also found missed topics, incorrect attribution, and jokes described as facts; this is a draft listening guide, not a verified account. Check selections with `--preview`, and use padding when a story needs more context. The Qwen comparison produced more reliable structured output but still had incorrect speaker attribution and imperfect grouping. On our M3 Max test, this roughly three-hour episode took about 21 minutes with `qwen3.6:27b`; other recordings and machines will differ. Processing with the Apple and Ollama backends stays on your Mac. The OpenAI backend, selected by a flag or saved preference, sends transcript text to the API.
-
-## One-time setup
-
-- Apple silicon Mac, macOS 26 or later, with a supported speech language.
-- Xcode 27 or later to build this version (it uses the current Foundation Models SDK).
-- For `--model apple`: Apple Intelligence enabled and its on-device model ready. `doctor` reports Apple model availability.
-- For `--model qwen3.6:27b` (or another Ollama model): Ollama running locally with that model already installed. Apple Intelligence is not required for Ollama summarization or selection.
-- FFmpeg for audio decoding and MP3 export: `brew install ffmpeg` if needed.
-
-```sh
-cd ~/Development/cwalcott/audiorundown
-swift build -c release
-mkdir -p ~/.bin
-cp .build/release/audiorundown ~/.bin/audiorundown
-audiorundown doctor
-
-# Save the preferences for this workflow once:
-audiorundown configure --model openai:gpt-6.1-sol \
-  --reasoning medium --max-cost 1.00 --editor "Visual Studio Code"
-```
-
-For Ollama, install a model once if needed with `ollama pull qwen3.6:27b`, then start the Ollama app or `ollama serve`. AudioRundown connects only to `127.0.0.1:11434`; it does not download models, use Ollama cloud models, or fall back to another provider. The Ollama backend currently requests a 32K context window with thinking disabled. Long recordings are processed in pieces, so the full transcript does not need to fit in that window. Transcription still uses Apple’s Speech framework regardless of the summary model.
-
-Make sure `~/.bin` is on your shell's `PATH`. Rebuild and copy the executable again after source updates.
-
-`configure` saves preferences in `~/.config/audiorundown/config.json`. Run it without options to inspect them. It never saves the API key. Command flags override preferences; `--model apple` or an installed Ollama model uses local summarization even when Sol is saved. A fresh installation without preferences defaults to Apple. The saved summary model does not change the local selection model. `--editor` takes a macOS application name; without it, `--open` uses the system's default Markdown app. `AUDIORUNDOWN_CONFIG` can override the config path for isolated environments.
+Local rundowns are experimental. The model summarizes short transcript pieces before grouping them, so clip boundaries are approximate. If structured grouping fails, the tool can use vocabulary changes to place boundaries while the selected model writes the summaries. All backends can omit topics or misattribute speakers. See [validation and limitations](VALIDATION.md) for the checks performed and what they do not establish.
 
 ## Transcription options and output files
 
@@ -215,7 +218,7 @@ audiorundown context "/path/to/recording.transcript/transcript.json" \
 
 Choose `overview`, `standard`, or `detailed`. This changes the summary instructions; it never discards the underlying transcript or requires retranscription. Selected ranges include overlapping segments in full to retain context. Timestamps always refer to the original recording.
 
-**`context` writes a prompt plus transcript; it does not generate a summary or call a model.** Summarization in this chat shares that text with the assistant. Use `rundown --model apple` or an installed Ollama model for on-device summarization instead. No speaker names are inferred by the transcription utility. Review important names, quotations, and clip boundaries against the audio.
+**`context` writes a prompt plus transcript; it does not generate a summary or call a model.** Providing the context file to a hosted assistant shares its transcript text with that service. Use `rundown --model apple` or an installed Ollama model for on-device summarization instead. No speaker names are inferred by the transcription utility. Review important names, quotations, and clip boundaries against the audio.
 
 ## Optional: export clips from the terminal
 
@@ -228,7 +231,7 @@ audiorundown clip "/path/to/recording.mp3" \
   --start 42:15 --end 49:30 \
   --title "The discussion I want to hear" \
   --album "My listening list" \
-  --artist "Howard Stern" \
+  --artist "Studio Notes" \
   --output "work/episodes/selected-discussion.mp3"
 ```
 
@@ -242,8 +245,8 @@ Create `selected.json`, using `examples/sections.json` as a template:
 
 ```json
 {
-  "album": "Howard Stern — June 2, 2026 — selections",
-  "artist": "Howard Stern",
+  "album": "Studio Notes — Episode 12 — selections",
+  "artist": "Studio Notes",
   "clips": [
     { "title": "First topic", "start": "00:42:15", "end": "00:49:30" },
     { "title": "Second topic", "start": "01:12:00", "end": "01:19:45" }
@@ -272,9 +275,9 @@ swift build -c release
 python3 scripts/test_exports.py .build/release/audiorundown
 ```
 
-The integration check creates temporary three-tone audio, verifies the selected time range by its actual audio content, checks codec/duration/ID3 tags, and exercises safe filenames, batch export, invalid ranges, and overwrite rejection. It does not require the user's recordings or download speech assets.
+The integration check creates temporary three-tone audio, verifies the selected time range by its actual audio content, checks codec/duration/ID3 tags, and exercises safe filenames, batch export, invalid ranges, and overwrite rejection. It does not require personal recordings or download speech assets.
 
-User audio, transcripts, and local experiments belong in ignored `work/`. Do not commit them. Swift unit tests do not exercise Apple's speech service; test that separately with an actual recording on a supported Mac.
+Keep recordings, transcripts, and model outputs in ignored `work/`, `*.transcript/`, or `*.clips/` directories. Do not commit them. Swift unit tests do not exercise Apple's speech service; test that separately with a recording you can use on a supported Mac. See [VALIDATION.md](VALIDATION.md) for findings and limitations, and [AGENTS.md](AGENTS.md) for contributor guidance.
 
 ## References
 
