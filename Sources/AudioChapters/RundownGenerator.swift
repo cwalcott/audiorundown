@@ -54,7 +54,7 @@ enum RundownGenerator {
     }
 
     @discardableResult
-    static func run(input: URL, destination: URL?, language: String, downloadAssets: Bool) async throws -> URL {
+    static func run(input: URL, destination: URL?, language: String, downloadAssets: Bool, modelName: String = "apple") async throws -> URL {
         let transcriptURL = try await transcriptFile(input: input, language: language, downloadAssets: downloadAssets)
         let transcript = try Transcript.load(transcriptURL)
         let output = destination ?? transcriptURL.deletingLastPathComponent().appendingPathComponent("rundown")
@@ -64,13 +64,16 @@ enum RundownGenerator {
             guard existing.transcriptFingerprint == fingerprint else {
                 throw UserError("This rundown belongs to a different transcript version. Choose a new --out-dir.")
             }
+            guard LocalIntelligence.savedModelName(engine: existing.engine) == (modelName == "apple" || modelName.contains(":") ? modelName : modelName + ":latest") else {
+                throw UserError("This rundown was generated with a different model. Choose a new --out-dir to compare models.")
+            }
             log("Using existing rundown: \(output.appendingPathComponent("rundown.md").path)")
             return output
         }
-        let intelligence = try LocalIntelligence()
+        let intelligence = try await LocalIntelligence(modelName: modelName)
         // Keep validated intermediate results outside the final folder for resumable retries.
         let cache = transcriptURL.deletingLastPathComponent().appendingPathComponent(".rundown-cache")
-        log("Generating a rundown locally with Apple Intelligence (\(intelligence.contextSize)-token context)…")
+        log("Generating a rundown with \(intelligence.engine) (\(intelligence.contextSize)-token context)…")
         let chunks = try await chunks(transcript: transcript, intelligence: intelligence)
         var beats: [TopicBeat] = []
         for (index, range) in chunks.enumerated() {
@@ -105,9 +108,10 @@ enum RundownGenerator {
             segments.append(.init(id: id, title: Rundown.prose(group.title), start: beats[range.lowerBound].start,
                                   end: beats[range.upperBound - 1].end, summary: Rundown.prose(summary), clips: clips))
         }
-        let rundown = Rundown(source: transcript.source, transcriptFingerprint: fingerprint,
+        var rundown = Rundown(source: transcript.source, transcriptFingerprint: fingerprint,
                               title: URL(fileURLWithPath: transcript.source).deletingPathExtension().lastPathComponent,
                               duration: transcript.duration, createdAt: Date(), segments: segments)
+        rundown.engine = intelligence.engine
         try rundown.validate()
         try await withNewDirectory(at: output) { staging in
             try jsonData(rundown).write(to: staging.appendingPathComponent("rundown.json"))
@@ -135,7 +139,7 @@ enum RundownGenerator {
                 if words >= 450 || transcript.segments[upper - 1].end - transcript.segments[lower].start >= 180 { break }
             }
             while !(try await intelligence.fits(beatPrompt(transcript: transcript, range: lower..<upper), instructions: instructions, outputTokens: 1900)) {
-                guard upper - lower > 1 else { throw UserError("A transcript line is too large for Apple's local model.") }
+                guard upper - lower > 1 else { throw UserError("A transcript line is too large for the selected local model.") }
                 upper = lower + (upper - lower) * 3 / 4
             }
             result.append(lower..<upper)
@@ -148,7 +152,7 @@ enum RundownGenerator {
         do {
             return try await group(beats: beats, intelligence: intelligence, cache: cache, detailed: detailed)
         } catch {
-            log("Apple could not produce a usable topic plan (\(error.localizedDescription)). Using vocabulary changes to place approximate boundaries.")
+            log("The selected model could not produce a usable topic plan (\(error.localizedDescription)). Using vocabulary changes to place approximate boundaries.")
             let count = detailed ? max(1, min(8, (beats.count + 1) / 2)) : min(10, max(1, min(5, beats.count / 3)))
             let ranges = TopicGrouping.boundaries(beats.map(\.summary), desiredCount: count)
             var result: [DraftGroup] = []

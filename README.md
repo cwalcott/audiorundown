@@ -2,7 +2,7 @@
 
 Turn a long recording into a readable rundown, then export selected sections as individual MP3 episodes for Overcast.
 
-Transcription uses Apple's **SpeechAnalyzer / SpeechTranscriber**. Summaries and natural-language clip selection use the **Foundation Models framework's on-device Apple Intelligence model**. Audio decoding and MP3 export use FFmpeg. No cloud fallback, API keys, or Swift package dependencies.
+Transcription uses Apple's **SpeechAnalyzer / SpeechTranscriber**. Summaries and natural-language clip selection can use **a local Ollama model** or the **Foundation Models framework's on-device Apple Intelligence model**. Audio decoding and MP3 export use FFmpeg. No cloud fallback, API keys, or Swift package dependencies.
 
 ## Everyday workflow
 
@@ -10,10 +10,11 @@ After the [one-time setup](#one-time-setup), run:
 
 ```sh
 cd ~/Development/cwalcott/audiochapters
-.build/release/audiochapters rundown "/path/to/recording.mp3" --interactive
+.build/release/audiochapters rundown "/path/to/recording.mp3" \
+  --model qwen3.6:27b --interactive
 ```
 
-This transcribes the audio if needed, generates a complete Markdown rundown, and opens a terminal prompt for choosing clips. Defaults are `en-US` and a `recording.transcript` folder beside the audio. Existing transcripts and finished rundowns are reused.
+This transcribes the audio if needed, generates a complete Markdown rundown, and opens a terminal prompt for choosing clips. Defaults are `en-US` and a `recording.transcript` folder beside the audio. Existing transcripts and finished rundowns for the same model are reused. The example uses Qwen through Ollama; omit `--model` (or use `--model apple`) to use Apple’s on-device model.
 
 Read `recording.transcript/rundown/rundown.md` in your preferred Markdown viewer. Each numbered main segment has a short **Summary** followed by a **Detailed rundown** of lettered clips. The generator aims for about five main segments, usually within ten, with flexibility for recordings with many topics. The saved `rundown.json` keeps the IDs and original timestamps stable.
 
@@ -34,7 +35,7 @@ Exports go beside the audio in `recording.clips/selection-001/`, then `selection
 Omit `--interactive` to generate only the rundown. You can also start from an existing transcript folder or `transcript.json`:
 
 ```sh
-.build/release/audiochapters rundown "/path/to/recording.transcript"
+.build/release/audiochapters rundown "/path/to/recording.transcript" --model qwen3.6:27b
 .build/release/audiochapters select "/path/to/recording.transcript/rundown"
 ```
 
@@ -47,17 +48,24 @@ For a single request, or to check the selection before exporting:
   --request "Export the guitar discussion with 10 seconds before it"
 ```
 
-`--preview` creates no files. `--out-dir DIR` chooses a new export folder; `--source AUDIO` locates the original if you moved it. Exact IDs require no language model. Natural-language selection uses only the saved catalog, so use the existing `clip` command below for custom time ranges or finer cuts.
+`--preview` creates no files. `--out-dir DIR` chooses a new export folder; `--source AUDIO` locates the original if you moved it. Exact IDs require no language model. For descriptions, `select` automatically uses the model saved with the rundown; `--model NAME` overrides it. Natural-language selection uses only the saved catalog, so use the existing `clip` command below for custom time ranges or finer cuts.
 
-`rundown --out-dir DIR` changes the rundown destination; its transcript still uses the normal adjacent folder. To choose a different transcript location, run `transcribe --out-dir DIR` first and pass that folder to `rundown`. Intermediate model results are cached in the transcript's `.rundown-cache` folder, so rerunning after an interruption reuses completed analysis. A finished rundown is reused without changing its IDs; choose a new rundown destination to regenerate it.
+`rundown --out-dir DIR` changes the rundown destination; its transcript still uses the normal adjacent folder. To choose a different transcript location, run `transcribe --out-dir DIR` first and pass that folder to `rundown`. Intermediate model results are cached in the transcript's `.rundown-cache` folder, so rerunning after an interruption reuses completed analysis. Caches are separate for each backend and Ollama model digest. A finished rundown is reused without changing its IDs; choose a new rundown destination to regenerate it or compare models:
 
-The local rundown is experimental. If Apple returns an invalid topic plan or declines structured generation, the tool reports that and uses vocabulary changes between notes to place approximate boundaries; Apple still writes the summaries and fallback titles. The model summarizes roughly two- to three-minute transcript pieces, groups them, then writes the finished summaries. Clip boundaries currently fall on those piece boundaries, so they can include neighboring material or miss the beginning of a story. Use `clip` for precise cuts. Our Stern tests also found missed topics, incorrect attribution, and jokes described as facts; this is a draft listening guide, not a verified account. Check selections with `--preview`, and use padding when a story needs more context. A long recording can take several minutes to summarize. All audio and transcript processing by these commands stays on your Mac.
+```sh
+.build/release/audiochapters rundown "/path/to/recording.transcript" \
+  --model qwen3.6:27b --out-dir "work/qwen-rundown"
+.build/release/audiochapters select "work/qwen-rundown"
+```
+
+The local rundown is experimental. If the selected model returns an invalid topic plan or declines structured generation, the tool reports that and uses vocabulary changes between notes to place approximate boundaries; the selected model still writes the summaries and fallback titles. The model summarizes roughly two- to three-minute transcript pieces, groups them, then writes the finished summaries. Clip boundaries currently fall on those piece boundaries, so they can include neighboring material or miss the beginning of a story. Use `clip` for precise cuts. Our Apple-model Stern tests also found missed topics, incorrect attribution, and jokes described as facts; this is a draft listening guide, not a verified account. Check selections with `--preview`, and use padding when a story needs more context. The Qwen comparison produced more reliable structured output but still had incorrect speaker attribution and imperfect grouping. On our M3 Max test, this roughly three-hour episode took about 21 minutes with `qwen3.6:27b`; other recordings and machines will differ. All audio and transcript processing by these commands stays on your Mac.
 
 ## One-time setup
 
 - Apple silicon Mac, macOS 26 or later, with a supported speech language.
 - Xcode 27 or later to build this version (it uses the current Foundation Models SDK).
-- Apple Intelligence enabled and its on-device model ready for rundown generation and natural-language selection. `doctor` reports availability.
+- For `--model apple`: Apple Intelligence enabled and its on-device model ready. `doctor` reports Apple model availability.
+- For `--model qwen3.6:27b` (or another Ollama model): Ollama running locally with that model already installed. Apple Intelligence is not required for Ollama summarization or selection.
 - FFmpeg for audio decoding and MP3 export: `brew install ffmpeg` if needed.
 
 ```sh
@@ -65,6 +73,8 @@ cd ~/Development/cwalcott/audiochapters
 swift build -c release
 .build/release/audiochapters doctor
 ```
+
+For Ollama, install a model once if needed with `ollama pull qwen3.6:27b`, then start the Ollama app or `ollama serve`. AudioChapters connects only to `127.0.0.1:11434`; it does not download models, use Ollama cloud models, or fall back to another provider. It currently requests a 32K context window with thinking disabled. Long recordings are processed in pieces, so the full transcript does not need to fit in that window. Transcription still uses Apple’s Speech framework regardless of the summary model.
 
 Rebuild after updating the source. You can also add `.build/release` to your PATH to use `audiochapters` directly, or use `swift run -c release audiochapters …`.
 
@@ -178,4 +188,5 @@ User audio, transcripts, and local experiments belong in ignored `work/`. Do not
 - [Apple: SpeechAnalyzer and on-device long-form transcription](https://developer.apple.com/videos/play/wwdc2025/277/)
 - [Apple: Foundation Models](https://developer.apple.com/documentation/foundationmodels)
 - [Apple: SpeechTranscriber](https://developer.apple.com/documentation/speech/speechtranscriber)
+- [Ollama: local chat API and structured outputs](https://docs.ollama.com/capabilities/structured-outputs)
 - [FFmpeg: seeking, duration, and metadata](https://ffmpeg.org/ffmpeg.html)

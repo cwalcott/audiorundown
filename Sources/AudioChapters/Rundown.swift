@@ -33,7 +33,7 @@ struct Rundown: Codable {
     }
 
     var markdown: String {
-        var lines = ["# \(Self.prose(title))", "", "\(Self.durationLabel(duration)) · Generated locally with Apple Intelligence", "",
+        var lines = ["# \(Self.prose(title))", "", "\(Self.durationLabel(duration)) · Generated locally with \(Self.prose(engine))", "",
                      "Experimental draft: check names, claims, and clip boundaries against the audio. Topic grouping can fall back to approximate vocabulary-based boundaries.", "",
                      "Times refer to the original recording. Select a whole segment (1) or an individual clip (1a).", ""]
         for segment in segments {
