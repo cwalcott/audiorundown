@@ -78,10 +78,10 @@ enum Selection {
             }
             return segment.clips.filter { ids.contains($0.id) }
         }
-        return ClipPlan(album: rundown.title, artist: "AudioChapters", clips: selected.map {
+        return ClipPlan(album: rundown.title, artist: "AudioChapters", useSourceMetadata: true, clips: selected.map {
             .init(title: "\($0.id). \($0.title)",
                   start: Timecode.format(max(0, $0.start - response.beforeSeconds)),
-                  end: Timecode.format((min(rundown.duration, $0.end + response.afterSeconds) * 1000).rounded(.down) / 1000))
+                  end: Timecode.format((min(rundown.duration, $0.end + response.afterSeconds) * 1000).rounded(.down) / 1000), summary: $0.summary)
         })
     }
 
@@ -156,7 +156,7 @@ enum Selection {
     }
 
     static func run(input: URL, request: String?, destination: URL?, sourceOverride: URL?, preview: Bool, modelName: String? = nil) async throws {
-        let rundown = try Rundown.load(input)
+        let rundown = try Rundown.load(Workflow.resolve(input))
         let source = sourceOverride ?? fileURL(rundown.source)
         if request == nil {
             list(rundown)

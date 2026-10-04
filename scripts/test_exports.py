@@ -3,6 +3,7 @@
 import array
 import json
 import math
+import os
 import pathlib
 import shutil
 import subprocess
@@ -29,12 +30,18 @@ def inspect(path):
 
 with tempfile.TemporaryDirectory(prefix='audiochapters-tests-') as tmp:
     root = pathlib.Path(tmp)
+    os.environ['AUDIOCHAPTERS_CONFIG'] = str(root / 'config.json')
     source = root / 'input with spaces.mp3'
     run(ffmpeg, '-v', 'error', '-f', 'lavfi', '-i', 'sine=frequency=440:duration=2',
         '-f', 'lavfi', '-i', 'sine=frequency=880:duration=2',
         '-f', 'lavfi', '-i', 'sine=frequency=1320:duration=2',
         '-filter_complex', '[0:a][1:a][2:a]concat=n=3:v=0:a=1[out]',
         '-map', '[out]', '-c:a', 'libmp3lame', '-q:a', '4', '-write_xing', '0', source)
+    # Add source metadata while keeping the original headerless timing fixture.
+    tagged = root / 'tagged.mp3'
+    run(ffmpeg, '-v', 'error', '-i', source, '-c:a', 'copy', '-write_xing', '0',
+        '-metadata', 'title=Test episode 2026-06-02', '-metadata', 'artist=Test host', tagged)
+    tagged.replace(source)
     output = root / 'selected.mp3'
     title = 'A title; $(not-a-command) "quoted"'
     run(binary, 'clip', source, '--start', '2.25', '--end', '3.75', '--title', title,
@@ -77,4 +84,63 @@ with tempfile.TemporaryDirectory(prefix='audiochapters-tests-') as tmp:
     run(binary, 'export', source, '--plan', plan, '--out-dir', root / 'invalid-batch', ok=False)
     assert not (root / 'invalid-batch').exists()
 
-print('Passed MP3 codec, duration, seek-content, metadata, overwrite, invalid-range, and batch-export checks.')
+    # Exercise the complete original-MP3 -> imported rundown -> selector export path.
+    transcript = source.with_suffix('.transcript')
+    transcript.mkdir()
+    (transcript / 'transcript.json').write_text(json.dumps({
+        'schemaVersion': 1, 'engine': 'Synthetic fixture', 'source': str(source), 'language': 'en-US', 'duration': 6, 'createdAt': '2026-10-04T00:00:00Z',
+        'segments': [{'start': 0, 'end': 6, 'text': 'Test transcript.', 'words': []}]}))
+    guide = root / 'guide.md'
+    long_title = 'The detailed discussion about television appearances and memorable stories from the early years'
+    guide.write_text(f"""# Test episode
+
+## 1. Television — 00:00:00–00:00:06
+### Summary
+Television memories.
+### Detailed rundown
+**1a. {long_title} — 00:00:02–00:00:04**
+The full story summary is retained in the export record.
+""")
+    catalog = root / 'custom-rundown'
+    imported = run(binary, 'import-rundown', guide, '--transcript', transcript, '--out-dir', catalog)
+    assert f"Choose clips: audiochapters select '{source}'" in imported.stdout.decode()
+    preview = run(binary, 'select', source, '--request', '1a', '--preview')
+    assert long_title in preview.stdout.decode()
+    assert not source.with_suffix('.clips').exists()
+    run(binary, 'select', source, '--request', '1a')
+    exported = source.with_suffix('.clips') / 'selection-001'
+    selected = next(exported.glob('*.mp3'))
+    tags = inspect(selected)['format']['tags']
+    assert tags['title'].endswith(' (Test episode 2026-06-02)')
+    assert tags['title'].startswith('1a. The detailed discussion')
+    assert '…' in tags['title'] and len(tags['title']) <= 103
+    assert tags['album'] == 'Test episode 2026-06-02'
+    assert tags['artist'] == 'Test host' and tags['track'] == '1/1'
+    assert 'Test-episode-2026-06-02' in selected.name
+    assert len(selected.name) <= 88
+    receipt = json.loads((exported / 'export.json').read_text())
+    assert receipt['clips'][0]['originalTitle'] == '1a. ' + long_title
+    assert receipt['clips'][0]['summary'] == 'The full story summary is retained in the export record.'
+    assert receipt['clips'][0]['start'] == 2 and receipt['clips'][0]['end'] == 4
+    # A second selection uses a new folder, with no overwritten MP3s.
+    run(binary, 'select', source, '--request', '1a')
+    assert (source.with_suffix('.clips') / 'selection-002').is_dir()
+
+    # Untagged sources fall back to their filename; hand-written plans remain compatible.
+    untagged = root / 'Untagged episode.mp3'
+    run(ffmpeg, '-v', 'error', '-i', source, '-map_metadata', '-1', '-c:a', 'copy', untagged)
+    run(binary, 'select', catalog, '--source', untagged, '--request', '1a')
+    fallback = next((untagged.with_suffix('.clips') / 'selection-001').glob('*.mp3'))
+    fallback_tags = inspect(fallback)['format']['tags']
+    assert fallback_tags['title'].endswith(' (Untagged episode)')
+    assert fallback_tags['album'] == 'Untagged episode' and fallback_tags['artist'] == 'AudioChapters'
+
+    run(binary, 'configure', '--model', 'openai:gpt-6.1-sol', '--editor', 'Visual Studio Code')
+    config = json.loads((root / 'config.json').read_text())
+    assert config['model'] == 'openai:gpt-6.1-sol' and config['reasoning'] == 'medium'
+    run(binary, 'configure', '--max-cost', 'nan', ok=False)
+    assert json.loads((root / 'config.json').read_text()) == config
+    # A saved API preference never affects exact-ID selection or makes a network request.
+    run(binary, 'select', source, '--request', '1a', '--preview')
+
+print('Passed audio, metadata, original-MP3 selection, title shortening, source-tag fallback, preferences, and safe-output checks.')

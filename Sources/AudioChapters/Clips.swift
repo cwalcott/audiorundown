@@ -3,12 +3,14 @@ import Foundation
 struct ClipPlan: Codable {
     var album: String?
     var artist: String?
+    var useSourceMetadata: Bool? = nil
     var clips: [Clip]
 
     struct Clip: Codable {
         let title: String
         let start: String
         let end: String
+        var summary: String? = nil
     }
 }
 
@@ -23,10 +25,38 @@ struct ExportReceipt: Codable {
         let title: String
         let start: Double
         let end: Double
+        var originalTitle: String? = nil
+        var summary: String? = nil
     }
 }
 
 enum Clips {
+    static func shortened(_ text: String, limit: Int) -> String {
+        let clean = text.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+        guard clean.count > limit else { return clean }
+        let prefix = String(clean.prefix(limit - 1))
+        if let space = prefix.lastIndex(of: " "), prefix.distance(from: prefix.startIndex, to: space) >= limit / 2 {
+            return String(prefix[..<space]) + "…"
+        }
+        return prefix + "…"
+    }
+
+    static func episodeMetadata(source: URL) throws -> (title: String, artist: String) {
+        struct Probe: Decodable {
+            struct Format: Decodable { let tags: [String: String]? }
+            let format: Format
+        }
+        let data = try Subprocess.run(Subprocess.executable("ffprobe"), [
+            "-v", "error", "-show_entries", "format_tags=title,artist", "-of", "json", source.path
+        ])
+        let tags = try JSONDecoder().decode(Probe.self, from: data).format.tags ?? [:]
+        func tag(_ key: String) -> String? {
+            let value = tags.first { $0.key.lowercased() == key }?.value.trimmingCharacters(in: .whitespacesAndNewlines)
+            return value?.isEmpty == false ? value : nil
+        }
+        return (tag("title") ?? source.deletingPathExtension().lastPathComponent, tag("artist") ?? "AudioChapters")
+    }
+
     /// MP3 container duration may be an estimate. Decode once for an exact timeline.
     static func sourceDuration(of source: URL) throws -> Double {
         try requireFile(source)
@@ -126,16 +156,20 @@ enum Clips {
             }
             return try AudioRange(start: Timecode.parse(clip.start), end: Timecode.parse(clip.end), sourceDuration: sourceDuration)
         }
-        let album = plan.album ?? source.deletingPathExtension().lastPathComponent
-        let artist = plan.artist ?? "AudioChapters"
+        let episode = plan.useSourceMetadata == true ? try episodeMetadata(source: source) : nil
+        let album = episode?.title ?? plan.album ?? source.deletingPathExtension().lastPathComponent
+        let artist = episode?.artist ?? plan.artist ?? "AudioChapters"
         try await withNewDirectory(at: destination) { staging in
             var entries: [ExportReceipt.Entry] = []
             for (index, clip) in plan.clips.enumerated() {
-                let filename = String(format: "%03d", index + 1) + "-" + safeFilename(clip.title) + ".mp3"
+                let title = episode.map { shortened(clip.title, limit: 60) + " (" + shortened($0.title, limit: 40) + ")" } ?? clip.title
+                // Keep room for both clip and episode in the filename as well as the ID3 title.
+                let fileTitle = episode.map { shortened(clip.title, limit: 44) + " " + shortened($0.title, limit: 30) } ?? clip.title
+                let filename = String(format: "%03d", index + 1) + "-" + safeFilename(fileTitle) + ".mp3"
                 log("Exporting \(index + 1)/\(plan.clips.count): \(clip.title)")
                 try encode(source: source, output: staging.appendingPathComponent(filename), range: ranges[index],
-                           title: clip.title, album: album, artist: artist, track: "\(index + 1)/\(plan.clips.count)")
-                entries.append(.init(file: filename, title: clip.title, start: ranges[index].start, end: ranges[index].end))
+                           title: title, album: album, artist: artist, track: "\(index + 1)/\(plan.clips.count)")
+                entries.append(.init(file: filename, title: title, start: ranges[index].start, end: ranges[index].end, originalTitle: clip.title, summary: clip.summary))
             }
             let receipt = ExportReceipt(source: source.path, createdAt: Date(), album: album, artist: artist, clips: entries)
             try jsonData(receipt).write(to: staging.appendingPathComponent("export.json"))

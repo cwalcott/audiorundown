@@ -61,3 +61,11 @@ The user also supplied a ChatGPT rundown generated at a reported medium reasonin
 - Exact-ID preview for `3c, 5g` gives 01:12:50.940–01:18:00.120 and 02:37:30.120–02:41:44.520. The latter ends at the final sung transcript entry, earlier than the Codex guide's applause/next-speech endpoint; padding may improve listening. The earlier user-approved clips were from the separate Codex rundown.
 - Rerunning the same generation command with `OPENAI_API_KEY` removed reused the saved rundown without a network request. Exact-ID selection also worked with no API key.
 - Live Apple selection initially reversed “10 seconds after” into leading padding. Explicit numeric before/after padding is now parsed by code; a regression test and repeated live preview confirmed the corrected performance range, 02:37:30.120–02:41:54.520. Natural-language topic matching remains model-based.
+
+
+## Everyday workflow and clip metadata (2026-10-04)
+
+- Added explicit saved preferences, `rundown --open`, printed next-step commands, and selection from the original MP3 or transcript folder. A pointer in the transcript folder remembers the last successful rundown, including custom destinations. Multiple older candidates require an explicit choice; a mismatched source is rejected.
+- Thirty Swift tests and the release build passed. Synthetic FFmpeg integration checks passed for source title/artist tags, shortened clip-plus-episode titles and filenames, full title/summary export records, untagged-source fallback, original-MP3 discovery, preview without exports, successive selection directories, and preservation of manual metadata overrides. Existing audio-content/seek and overwrite checks continue to pass.
+- Installed the executable in `~/.bin` and saved the user's Sol/medium/$1 estimated-cap/VS Code preferences. Reused the existing Stern API rundown with the API key removed: no network request or regeneration. Exact-ID preview retained the saved ranges; live Apple selection of the Sharon Stone story with ten seconds after it produced 01:12:50.940–01:18:10.120.
+- No new summary generation or paid API call was needed. These checks cover workflow and metadata, not summary accuracy or display behavior in Overcast.

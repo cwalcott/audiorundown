@@ -6,19 +6,38 @@ Transcription uses Apple's **SpeechAnalyzer / SpeechTranscriber**. Rundowns can 
 
 ## Everyday workflow
 
-After the [one-time setup](#one-time-setup), run:
+After the [one-time setup](#one-time-setup), the usual process is two commands:
 
 ```sh
-cd ~/Development/cwalcott/audiochapters
-.build/release/audiochapters rundown "/path/to/recording.mp3" \
-  --model qwen3.6:27b --interactive
+audiochapters rundown "$HOME/Downloads/recording.mp3" --open
+# Read the summary, then choose what to listen to:
+audiochapters select "$HOME/Downloads/recording.mp3"
 ```
 
-This transcribes the audio if needed, generates a complete Markdown rundown, and opens a terminal prompt for choosing clips. Defaults are `en-US` and a `recording.transcript` folder beside the audio. Existing transcripts and finished rundowns for the same model are reused. The example uses Qwen through Ollama; omit `--model` (or use `--model apple`) to use Apple’s on-device model.
+`rundown` transcribes if needed, then summarizes with your saved model preference. It prints the exact Markdown path and a copyable command for choosing clips. `--open` opens the Markdown in your configured app; omit it to open the printed path yourself. Add `--interactive` to start choosing clips immediately after generation.
 
-Read `recording.transcript/rundown/rundown.md` in your preferred Markdown viewer. Each numbered main segment has a short **Summary** followed by a **Detailed rundown** of lettered clips. The generator aims for about five main segments, usually within ten, with flexibility for recordings with many topics. The saved `rundown.json` keeps the IDs and original timestamps stable.
+Defaults are `en-US` and folders beside the source audio. With the Sol preferences below, the files are:
 
-At the terminal prompt, enter a selection:
+```text
+Downloads/
+  recording.mp3
+  recording.transcript/
+    transcript.json, transcript.txt, transcript.srt, listening-guide-prompt.md
+    active-rundown.json
+    .openai-rundown-cache/
+    rundown-openai/
+      rundown.md, rundown.json, model-draft.json, api-usage.json
+  recording.clips/
+    selection-001/
+      001-clip-title-episode-title.mp3
+      export.json, sections.json
+    selection-002/
+      ...
+```
+
+The Markdown has numbered main segments, each with a short **Summary** and a **Detailed rundown** of lettered clips. The generator aims for about five main segments, usually within ten, while following the recording's topics.
+
+At the selection prompt, enter IDs or describe what you want:
 
 ```text
 1, 3b
@@ -26,16 +45,20 @@ Export the Sharon Stone story and the Ralph billing story
 Export the whole Letterman segment with 10 seconds before it
 ```
 
-These descriptions are examples; available topics depend on the recording. The tool prints the selected titles and times, then exports each selection as an MP3. If a request is ambiguous, it asks a follow-up question. Use `list` to see the IDs, `show 3b` to read an item's summary, or `quit` to exit. Selecting a parent segment and one of its children exports the parent once.
+IDs export immediately without a model. Descriptions use a local model and may ask for clarification. `list` shows the available IDs, `show 3b` reads an item's summary, and `quit` exits. Selecting a parent and its child exports the parent once. Start with `select ... --preview` to inspect choices without exporting. Selection chooses existing catalog entries; use `clip` below for arbitrary time ranges.
 
-Exports go beside the audio in `recording.clips/selection-001/`, then `selection-002/`, and so on. Upload the MP3s through your Overcast upload workflow. Uploading is still manual.
+Each selected MP3 gets a title like **“3c. Letterman entrances (THSS 2026-06-02)”**. The episode name comes from the source's title tag, falling back to its filename. Long clip and episode names are shortened at word boundaries (60 and 40 characters respectively); filenames use shorter versions. The album tag keeps the full episode title, the artist comes from the source when present, and track numbers preserve export order. The export records retain the full clip title, summary, and original time range. Explicit titles in the manual `clip` and `export` commands are preserved.
+
+Upload the desired MP3s to Overcast manually. Each exported MP3 is self-contained, so you can delete the source and generated folders once you no longer need them. Keeping the transcript folder lets you reuse the transcript and cached summaries; further clip exports still need the original audio.
+
+`select recording.mp3` finds the latest successfully generated or imported rundown remembered in the adjacent transcript folder. You can also pass a transcript folder, `transcript.json`, or a specific rundown folder/file. With an older folder containing multiple rundowns and no saved preference, pass the desired rundown folder explicitly. If you put the transcript elsewhere, use that folder or the printed selection command.
 
 ### Generate a full-episode rundown with Sol
 
 Set `OPENAI_API_KEY` in the shell that runs the command. If you already exported it in `~/.zshrc`, run `source ~/.zshrc`. Keep the key out of the repository, command-line arguments, logs, and chat. The API project needs Responses access and API billing/model access.
 
 ```sh
-.build/release/audiochapters rundown "/path/to/recording.mp3" \
+audiochapters rundown "/path/to/recording.mp3" \
   --model openai:gpt-6.1-sol --interactive
 ```
 
@@ -44,7 +67,7 @@ You can pass an existing transcript folder or `transcript.json` to reuse transcr
 Default output is `recording.transcript/rundown-openai/`, containing `rundown.md`, `rundown.json`, `model-draft.json`, and `api-usage.json`. Open the selector later with:
 
 ```sh
-.build/release/audiochapters select "/path/to/recording.transcript/rundown-openai"
+audiochapters select "/path/to/recording.transcript/rundown-openai"
 ```
 
 Selection defaults to Apple's local model; exact IDs require neither a model nor the API key. Use `select --model gemma4:31b` to select by description with local Ollama instead. API generation is currently supported only for `openai:gpt-6.1-sol`.
@@ -64,11 +87,11 @@ API responses are cached locally in `.openai-rundown-cache` inside the transcrip
 Import a Markdown listening guide once, using the original transcript to identify the source audio and recording duration:
 
 ```sh
-.build/release/audiochapters import-rundown "/path/to/episode-rundown.md" \
+audiochapters import-rundown "/path/to/episode-rundown.md" \
   --transcript "/path/to/recording.transcript" \
   --out-dir "work/imported-rundown" \
   --engine "Sol via Codex"
-.build/release/audiochapters select "work/imported-rundown"
+audiochapters select "work/imported-rundown"
 ```
 
 The import does not call a model. It preserves titles, summaries, IDs, and timestamps, and saves the supplied Markdown as `original.md` alongside `rundown.json` and a normalized `rundown.md`. Without `--out-dir`, the destination is `episode-rundown.rundown` beside the input Markdown. Existing output folders are never replaced. `--engine` is an optional provenance label, not a model to call.
@@ -97,16 +120,16 @@ Segment IDs must be consecutive (`1`, `2`, …), with consecutive clip letters u
 Omit `--interactive` to generate only the rundown. You can also start from an existing transcript folder or `transcript.json`:
 
 ```sh
-.build/release/audiochapters rundown "/path/to/recording.transcript" --model qwen3.6:27b
-.build/release/audiochapters select "/path/to/recording.transcript/rundown"
+audiochapters rundown "/path/to/recording.transcript" --model qwen3.6:27b
+audiochapters select "/path/to/recording.transcript/rundown"
 ```
 
 For a single request, or to check the selection before exporting:
 
 ```sh
-.build/release/audiochapters select "/path/to/recording.transcript/rundown" \
+audiochapters select "/path/to/recording.transcript/rundown" \
   --request "3b, 5" --preview
-.build/release/audiochapters select "/path/to/recording.transcript/rundown" \
+audiochapters select "/path/to/recording.transcript/rundown" \
   --request "Export the guitar discussion with 10 seconds before it"
 ```
 
@@ -115,12 +138,12 @@ For a single request, or to check the selection before exporting:
 `rundown --out-dir DIR` changes the rundown destination; its transcript still uses the normal adjacent folder. To choose a different transcript location, run `transcribe --out-dir DIR` first and pass that folder to `rundown`. Intermediate model results are cached in the transcript's `.rundown-cache` folder, so rerunning after an interruption reuses completed analysis. Caches are separate for each backend and Ollama model digest. A finished rundown is reused without changing its IDs; choose a new rundown destination to regenerate it or compare models:
 
 ```sh
-.build/release/audiochapters rundown "/path/to/recording.transcript" \
+audiochapters rundown "/path/to/recording.transcript" \
   --model qwen3.6:27b --out-dir "work/qwen-rundown"
-.build/release/audiochapters select "work/qwen-rundown"
+audiochapters select "work/qwen-rundown"
 ```
 
-The local rundown is experimental. If the selected model returns an invalid topic plan or declines structured generation, the tool reports that and uses vocabulary changes between notes to place approximate boundaries; the selected model still writes the summaries and fallback titles. The model summarizes roughly two- to three-minute transcript pieces, groups them, then writes the finished summaries. Clip boundaries currently fall on those piece boundaries, so they can include neighboring material or miss the beginning of a story. Use `clip` for precise cuts. Our Apple-model Stern tests also found missed topics, incorrect attribution, and jokes described as facts; this is a draft listening guide, not a verified account. Check selections with `--preview`, and use padding when a story needs more context. The Qwen comparison produced more reliable structured output but still had incorrect speaker attribution and imperfect grouping. On our M3 Max test, this roughly three-hour episode took about 21 minutes with `qwen3.6:27b`; other recordings and machines will differ. Processing with the Apple and Ollama backends stays on your Mac. The explicitly selected OpenAI backend sends transcript text to the API.
+The local rundown is experimental. If the selected model returns an invalid topic plan or declines structured generation, the tool reports that and uses vocabulary changes between notes to place approximate boundaries; the selected model still writes the summaries and fallback titles. The model summarizes roughly two- to three-minute transcript pieces, groups them, then writes the finished summaries. Clip boundaries currently fall on those piece boundaries, so they can include neighboring material or miss the beginning of a story. Use `clip` for precise cuts. Our Apple-model Stern tests also found missed topics, incorrect attribution, and jokes described as facts; this is a draft listening guide, not a verified account. Check selections with `--preview`, and use padding when a story needs more context. The Qwen comparison produced more reliable structured output but still had incorrect speaker attribution and imperfect grouping. On our M3 Max test, this roughly three-hour episode took about 21 minutes with `qwen3.6:27b`; other recordings and machines will differ. Processing with the Apple and Ollama backends stays on your Mac. The OpenAI backend, selected by a flag or saved preference, sends transcript text to the API.
 
 ## One-time setup
 
@@ -133,19 +156,27 @@ The local rundown is experimental. If the selected model returns an invalid topi
 ```sh
 cd ~/Development/cwalcott/audiochapters
 swift build -c release
-.build/release/audiochapters doctor
+mkdir -p ~/.bin
+cp .build/release/audiochapters ~/.bin/audiochapters
+audiochapters doctor
+
+# Save the preferences for this workflow once:
+audiochapters configure --model openai:gpt-6.1-sol \
+  --reasoning medium --max-cost 1.00 --editor "Visual Studio Code"
 ```
 
 For Ollama, install a model once if needed with `ollama pull qwen3.6:27b`, then start the Ollama app or `ollama serve`. AudioChapters connects only to `127.0.0.1:11434`; it does not download models, use Ollama cloud models, or fall back to another provider. The Ollama backend currently requests a 32K context window with thinking disabled. Long recordings are processed in pieces, so the full transcript does not need to fit in that window. Transcription still uses Apple’s Speech framework regardless of the summary model.
 
-Rebuild after updating the source. You can also add `.build/release` to your PATH to use `audiochapters` directly, or use `swift run -c release audiochapters …`.
+Make sure `~/.bin` is on your shell's `PATH`. Rebuild and copy the executable again after source updates.
+
+`configure` saves preferences in `~/.config/audiochapters/config.json`. Run it without options to inspect them. It never saves the API key. Command flags override preferences; `--model apple` or an installed Ollama model uses local summarization even when Sol is saved. A fresh installation without preferences defaults to Apple. The saved summary model does not change the local selection model. `--editor` takes a macOS application name; without it, `--open` uses the system's default Markdown app. `AUDIOCHAPTERS_CONFIG` can override the config path for isolated environments.
 
 ## Transcription options and output files
 
 Use optional overrides only when you want a different language or destination:
 
 ```sh
-.build/release/audiochapters transcribe "/path/to/recording.mp3" \
+audiochapters transcribe "/path/to/recording.mp3" \
   --language en-GB --out-dir "work/another-recording.transcript"
 ```
 
@@ -171,20 +202,20 @@ This is useful when you want a portable file containing both summary instruction
 Create context for a short overview of the entire show:
 
 ```sh
-.build/release/audiochapters context "/path/to/recording.transcript/transcript.json" \
+audiochapters context "/path/to/recording.transcript/transcript.json" \
   --detail overview --output work/overview-context.md
 ```
 
 Give that file to Codex or another assistant to summarize. Then prepare a more detailed view of just a section:
 
 ```sh
-.build/release/audiochapters context "/path/to/recording.transcript/transcript.json" \
+audiochapters context "/path/to/recording.transcript/transcript.json" \
   --detail detailed --start 42:15 --end 49:30 --output work/section-context.md
 ```
 
 Choose `overview`, `standard`, or `detailed`. This changes the summary instructions; it never discards the underlying transcript or requires retranscription. Selected ranges include overlapping segments in full to retain context. Timestamps always refer to the original recording.
 
-**`context` writes a prompt plus transcript; it does not generate a summary or call a model.** Summarization in this chat shares that text with the assistant. Use `rundown` for on-device summarization instead. No speaker names are inferred by the transcription utility. Review important names, quotations, and clip boundaries against the audio.
+**`context` writes a prompt plus transcript; it does not generate a summary or call a model.** Summarization in this chat shares that text with the assistant. Use `rundown --model apple` or an installed Ollama model for on-device summarization instead. No speaker names are inferred by the transcription utility. Review important names, quotations, and clip boundaries against the audio.
 
 ## Optional: export clips from the terminal
 
@@ -193,7 +224,7 @@ Use these commands for exact time ranges or a hand-written export plan.
 ### Export one section
 
 ```sh
-.build/release/audiochapters clip "/path/to/recording.mp3" \
+audiochapters clip "/path/to/recording.mp3" \
   --start 42:15 --end 49:30 \
   --title "The discussion I want to hear" \
   --album "My listening list" \
@@ -223,7 +254,7 @@ Create `selected.json`, using `examples/sections.json` as a template:
 These are illustrative times, not recommendations for a particular recording.
 
 ```sh
-.build/release/audiochapters export "/path/to/recording.mp3" \
+audiochapters export "/path/to/recording.mp3" \
   --plan selected.json
 ```
 

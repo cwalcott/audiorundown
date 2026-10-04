@@ -51,30 +51,37 @@ struct AudioChapters {
         }
         let rest = Array(args.dropFirst())
         switch command {
+        case "configure":
+            try Settings.configure(Arguments(rest, values: ["--model", "--reasoning", "--max-cost", "--editor"]))
         case "transcribe":
             let a = try Arguments(rest, values: ["--language", "--out-dir"], switches: ["--no-download"])
             let source = try a.source()
             let destination = a.options["--out-dir"].map(fileURL) ?? source.deletingPathExtension().appendingPathExtension("transcript")
             try await Transcription.run(source: source, language: a.options["--language"] ?? "en-US", destination: destination, downloadAssets: !a.flags.contains("--no-download"))
         case "rundown":
-            let a = try Arguments(rest, values: ["--language", "--out-dir", "--model", "--reasoning", "--max-cost"], switches: ["--no-download", "--interactive"])
-            let model = a.options["--model"] ?? "apple"
+            let a = try Arguments(rest, values: ["--language", "--out-dir", "--model", "--reasoning", "--max-cost"], switches: ["--no-download", "--interactive", "--open"])
+            let settings = try Settings.load()
+            let model = a.options["--model"] ?? settings.model
             let output: URL
             if model.hasPrefix("openai:") {
                 guard model == OpenAIClient.selector else { throw UserError("Supported API model: \(OpenAIClient.selector)") }
-                guard let maxCost = Double(a.options["--max-cost"] ?? "1.00") else { throw UserError("--max-cost must be a positive USD amount.") }
-                output = try await OpenAIRundown.run(input: a.source(), destination: a.options["--out-dir"].map(fileURL), language: a.options["--language"] ?? "en-US", downloadAssets: !a.flags.contains("--no-download"), reasoning: a.options["--reasoning"] ?? "medium", maxCost: maxCost)
+                guard let maxCost = Double(a.options["--max-cost"] ?? String(settings.maxCost)) else { throw UserError("--max-cost must be a positive USD amount.") }
+                output = try await OpenAIRundown.run(input: a.source(), destination: a.options["--out-dir"].map(fileURL), language: a.options["--language"] ?? "en-US", downloadAssets: !a.flags.contains("--no-download"), reasoning: a.options["--reasoning"] ?? settings.reasoning, maxCost: maxCost)
             } else {
                 guard a.options["--reasoning"] == nil, a.options["--max-cost"] == nil else { throw UserError("--reasoning and --max-cost apply only to --model openai:gpt-6.1-sol.") }
                 output = try await RundownGenerator.run(input: a.source(), destination: a.options["--out-dir"].map(fileURL), language: a.options["--language"] ?? "en-US", downloadAssets: !a.flags.contains("--no-download"), modelName: model)
             }
+            try Workflow.remember(output: output, transcriptInput: a.source())
+            try Workflow.finish(output: output, settings: settings, open: a.flags.contains("--open"))
             if a.flags.contains("--interactive") {
                 try await Selection.run(input: output, request: nil, destination: nil, sourceOverride: nil, preview: false)
             }
         case "import-rundown":
             let a = try Arguments(rest, values: ["--transcript", "--out-dir", "--engine"])
-            _ = try await RundownImport.run(input: a.source(), transcriptInput: fileURL(a.required("--transcript")),
+            let output = try await RundownImport.run(input: a.source(), transcriptInput: fileURL(a.required("--transcript")),
                                            destination: a.options["--out-dir"].map(fileURL), engine: a.options["--engine"] ?? "Imported Markdown")
+            try Workflow.remember(output: output, transcriptInput: fileURL(a.required("--transcript")))
+            try Workflow.finish(output: output, settings: Settings.load(), open: false)
         case "select":
             let a = try Arguments(rest, values: ["--request", "--out-dir", "--source", "--model"], switches: ["--preview"])
             try await Selection.run(input: a.source(), request: a.options["--request"], destination: a.options["--out-dir"].map(fileURL), sourceOverride: a.options["--source"].map(fileURL), preview: a.flags.contains("--preview"), modelName: a.options["--model"])
@@ -113,16 +120,17 @@ struct AudioChapters {
     AudioChapters — local Apple speech transcription and MP3 episode export
 
     USAGE
-      audiochapters rundown INPUT [--model apple|OLLAMA_MODEL|openai:gpt-6.1-sol] [--out-dir DIR] [--language en-US] [--no-download] [--interactive]
+      audiochapters rundown INPUT [--model apple|OLLAMA_MODEL|openai:gpt-6.1-sol] [--out-dir DIR] [--language en-US] [--no-download] [--interactive] [--open]
                             [--reasoning medium] [--max-cost 1.00] (OpenAI only)
       audiochapters import-rundown FILE.md --transcript TRANSCRIPT [--out-dir DIR] [--engine LABEL]
-      audiochapters select RUNDOWN [--model apple|OLLAMA_MODEL] [--request "1, 3b"] [--preview] [--out-dir DIR] [--source AUDIO]
+      audiochapters select INPUT [--model apple|OLLAMA_MODEL] [--request "1, 3b"] [--preview] [--out-dir DIR] [--source AUDIO]
       audiochapters transcribe INPUT [--language en-US] [--out-dir DIR] [--no-download]
       audiochapters clip INPUT --start TIME --end TIME --output FILE.mp3
                          [--title TITLE] [--album ALBUM] [--artist ARTIST]
       audiochapters export INPUT --plan sections.json [--out-dir DIR]
       audiochapters context transcript.json --output summary-context.md
                             [--detail overview|standard|detailed] [--start TIME --end TIME]
+      audiochapters configure [--model MODEL] [--reasoning medium] [--max-cost 1.00] [--editor APP]
       audiochapters languages
       audiochapters doctor
 
@@ -149,7 +157,11 @@ struct AudioChapters {
     Transcription uses Apple's on-device model; first use may download language assets.
     context prepares a prompt plus timed transcript for an assistant; it does not call a model.
     rundown accepts audio, a transcript folder, or transcript.json; it reuses existing transcripts.
-    Rundown defaults to Apple Intelligence; --model qwen3.6:27b uses local Ollama.
+    Rundown uses your saved model preference (apple on a fresh install). Flags override preferences.
+    configure saves defaults in ~/.config/audiochapters/config.json; no API key is saved.
+    --open opens the Markdown in your configured editor (otherwise the system default app).
+    select accepts the original audio, a transcript folder, or a saved rundown.
+    The latest successfully generated/imported rundown is remembered in the transcript folder.
     import-rundown imports numbered Markdown with original timestamps; see README for the format.
     OpenAI rundown sends the full transcript text to the API using OPENAI_API_KEY; billing is separate.
     API default output: INPUT.transcript/rundown-openai. Saved results are reused without API calls.

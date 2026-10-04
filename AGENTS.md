@@ -18,6 +18,7 @@ Prefer simple defaults and an interactive selection workflow. Rundowns should ha
 ## Code map
 
 - `Sources/AudioChapters/CLI.swift`: argument parsing, command dispatch, and help.
+- `Settings.swift`, `Workflow.swift`: saved preferences, rundown discovery, and next-step commands.
 - `Transcription.swift`: Apple Speech transcription and transcript outputs.
 - `RundownGenerator.swift`, `TopicGrouping.swift`: local summary generation and topic grouping.
 - `Rundown.swift`, `RundownImport.swift`: saved catalog, validation, Markdown rendering and import.
@@ -36,7 +37,7 @@ Paths in this code map after the first entry are relative to `Sources/AudioChapt
 - Generated schema-1 rundowns require complete coverage. Imported and API schema-2 rundowns allow gaps but require ordered, nonoverlapping segments and clips within their parent. API drafts must cover all transcript entries; timestamps are derived from validated entry indices. Preserve imported timestamps rather than filling gaps or shifting boundaries.
 - Preserve stable saved IDs and truthful model provenance. Importing a rundown does not call its authoring model. Imported and API catalogs default to Apple for descriptive selection; `--model` can override the selector.
 - Keep existing outputs intact and publish new output directories atomically. Pass subprocess arguments directly, without shell evaluation.
-- Preserve explicit backend selection, loopback-only Ollama transport, and the absence of silent cloud fallback or automatic model downloads. Only `--model openai:gpt-6.1-sol` sends transcript text to OpenAI; audio and selection stay local. Keep API keys out of source, arguments, logs, and saved responses. Preserve no-redirect transport, preflight cost checks, and local response reuse without automatic paid retries. Tests use synthetic responses; live API calls are not routine regression checks.
+- Preserve explicit backend selection, loopback-only Ollama transport, and the absence of silent cloud fallback or automatic model downloads. Only an explicit `--model openai:gpt-6.1-sol` or that explicitly saved rundown preference sends transcript text to OpenAI; audio and selection stay local. Keep API keys out of source, arguments, logs, and saved responses. Preserve no-redirect transport, preflight cost checks, and local response reuse without automatic paid retries. Tests use synthetic responses; live API calls are not routine regression checks.
 - Structural validation does not establish summary accuracy. Evaluate speaker attribution, jokes versus factual claims, music versus conversation, topic coverage, and useful listening boundaries separately. Record experimental findings without turning a single episode into a general model ranking.
 
 ## Repository hygiene
