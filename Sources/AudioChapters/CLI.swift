@@ -62,6 +62,10 @@ struct AudioChapters {
             if a.flags.contains("--interactive") {
                 try await Selection.run(input: output, request: nil, destination: nil, sourceOverride: nil, preview: false)
             }
+        case "import-rundown":
+            let a = try Arguments(rest, values: ["--transcript", "--out-dir", "--engine"])
+            _ = try await RundownImport.run(input: a.source(), transcriptInput: fileURL(a.required("--transcript")),
+                                           destination: a.options["--out-dir"].map(fileURL), engine: a.options["--engine"] ?? "Imported Markdown")
         case "select":
             let a = try Arguments(rest, values: ["--request", "--out-dir", "--source", "--model"], switches: ["--preview"])
             try await Selection.run(input: a.source(), request: a.options["--request"], destination: a.options["--out-dir"].map(fileURL), sourceOverride: a.options["--source"].map(fileURL), preview: a.flags.contains("--preview"), modelName: a.options["--model"])
@@ -101,6 +105,7 @@ struct AudioChapters {
 
     USAGE
       audiochapters rundown INPUT [--model apple|OLLAMA_MODEL] [--out-dir DIR] [--language en-US] [--no-download] [--interactive]
+      audiochapters import-rundown FILE.md --transcript TRANSCRIPT [--out-dir DIR] [--engine LABEL]
       audiochapters select RUNDOWN [--model apple|OLLAMA_MODEL] [--request "1, 3b"] [--preview] [--out-dir DIR] [--source AUDIO]
       audiochapters transcribe INPUT [--language en-US] [--out-dir DIR] [--no-download]
       audiochapters clip INPUT --start TIME --end TIME --output FILE.mp3
@@ -135,7 +140,9 @@ struct AudioChapters {
     context prepares a prompt plus timed transcript for an assistant; it does not call a model.
     rundown accepts audio, a transcript folder, or transcript.json; it reuses existing transcripts.
     Rundown defaults to Apple Intelligence; --model qwen3.6:27b uses local Ollama.
-    Selection defaults to the saved rundown’s model. Exact IDs need no model.
+    import-rundown imports numbered Markdown with original timestamps; see README for the format.
+    Selection defaults to the saved rundown’s local model, or Apple for imported Markdown.
+    Exact IDs need no model. Use select --model to choose a different local selector.
     Default rundown: INPUT.transcript/rundown/{rundown.md,rundown.json}.
     Default selections: INPUT.clips/selection-001/ (then 002, 003…).
     Audio decoding and MP3 export require FFmpeg. Upload exported MP3s to Overcast manually.

@@ -30,6 +30,39 @@ These descriptions are examples; available topics depend on the recording. The t
 
 Exports go beside the audio in `recording.clips/selection-001/`, then `selection-002/`, and so on. Upload the MP3s through your Overcast upload workflow. Uploading is still manual.
 
+### Use a rundown from Codex or ChatGPT
+
+Import a Markdown listening guide once, using the original transcript to identify the source audio and recording duration:
+
+```sh
+.build/release/audiochapters import-rundown "/path/to/episode-rundown.md" \
+  --transcript "/path/to/recording.transcript" \
+  --out-dir "work/imported-rundown" \
+  --engine "Sol via Codex"
+.build/release/audiochapters select "work/imported-rundown"
+```
+
+The import does not call a model. It preserves titles, summaries, IDs, and timestamps, and saves the supplied Markdown as `original.md` alongside `rundown.json` and a normalized `rundown.md`. Without `--out-dir`, the destination is `episode-rundown.rundown` beside the input Markdown. Existing output folders are never replaced. `--engine` is an optional provenance label, not a model to call.
+
+In the selector, enter `list`, `show 3d`, or IDs such as `3d, 6i`. Entering IDs or a descriptive selection exports MP3s immediately; add `--preview` when starting the selector to inspect selections without exporting. Imported rundowns use Apple's on-device model for descriptive requests by default. To use Ollama instead, start the selector with `--model gemma4:31b`. Exact IDs need no model, and Sol/API access is not needed to select clips from its saved rundown. Requests select existing catalog entries; they do not create new, finer subdivisions.
+
+The importer accepts this specific format (including the heading levels and inline times), rather than arbitrary Markdown. Ask the summarizing assistant to follow it:
+
+```markdown
+# Episode title
+
+## 1. Main topic — 00:00:01–00:05:00
+### Summary
+One paragraph summarizing the main topic.
+### Detailed rundown
+**1a. First story — 00:00:01–00:02:30**
+A more detailed description.
+**1b. Second story — 00:02:33–00:05:00**
+A more detailed description.
+```
+
+Segment IDs must be consecutive (`1`, `2`, …), with consecutive clip letters under each (`1a`, `1b`, …). Use original `HH:MM:SS` timestamps (optional fractional seconds), ordered nonoverlapping segments, and clips contained within their segment. Gaps for silence or transitions are allowed and never filled automatically. Malformed headings, missing summaries, and invalid ranges are rejected before writing output. The selected transcript must belong to the recording summarized in the Markdown; timing validation cannot detect a guide for a different episode of similar length.
+
 ### Generate now, choose clips later
 
 Omit `--interactive` to generate only the rundown. You can also start from an existing transcript folder or `transcript.json`:

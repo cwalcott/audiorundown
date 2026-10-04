@@ -33,8 +33,9 @@ struct Rundown: Codable {
     }
 
     var markdown: String {
-        var lines = ["# \(Self.prose(title))", "", "\(Self.durationLabel(duration)) · Generated locally with \(Self.prose(engine))", "",
-                     "Experimental draft: check names, claims, and clip boundaries against the audio. Topic grouping can fall back to approximate vocabulary-based boundaries.", "",
+        let provenance = schemaVersion == 2 ? "Imported from \(Self.prose(engine))" : "Generated locally with \(Self.prose(engine))"
+        let note = schemaVersion == 2 ? "Imported timestamps are preserved; gaps between selections are allowed." : "Experimental draft: check names, claims, and clip boundaries against the audio. Topic grouping can fall back to approximate vocabulary-based boundaries."
+        var lines = ["# \(Self.prose(title))", "", "\(Self.durationLabel(duration)) · \(provenance)", "", note, "",
                      "Times refer to the original recording. Select a whole segment (1) or an individual clip (1a).", ""]
         for segment in segments {
             lines += ["## \(segment.id). \(Self.prose(segment.title))",
@@ -70,28 +71,30 @@ struct Rundown: Codable {
     }
 
     func validate() throws {
-        guard schemaVersion == 1, duration.isFinite, duration > 0, duration < 1_000_000_000,
+        guard [1, 2].contains(schemaVersion), duration.isFinite, duration > 0, duration < 1_000_000_000,
               !segments.isEmpty, !source.isEmpty else { throw UserError("Invalid or unsupported rundown.") }
         var expectedStart = 0.0
         for (index, segment) in segments.enumerated() {
-            guard segment.id == String(index + 1), abs(segment.start - expectedStart) < 0.002,
+            guard segment.id == String(index + 1), segment.start >= expectedStart,
+                  (schemaVersion == 2 || abs(segment.start - expectedStart) < 0.002),
                   !segment.title.isEmpty, !segment.summary.isEmpty, !segment.clips.isEmpty else {
                 throw UserError("Invalid segment IDs, text, or coverage in rundown.")
             }
             _ = try AudioRange(start: segment.start, end: segment.end, sourceDuration: duration)
             var clipStart = segment.start
             for (clipIndex, clip) in segment.clips.enumerated() {
-                guard clip.id == segment.id + Self.letters(clipIndex), abs(clip.start - clipStart) < 0.002,
+                guard clip.id == segment.id + Self.letters(clipIndex), clip.start >= clipStart,
+                      (schemaVersion == 2 || abs(clip.start - clipStart) < 0.002),
                       !clip.title.isEmpty, !clip.summary.isEmpty else {
                     throw UserError("Invalid clip IDs, text, or coverage in rundown.")
                 }
                 _ = try AudioRange(start: clip.start, end: clip.end, sourceDuration: segment.end)
                 clipStart = clip.end
             }
-            guard abs(clipStart - segment.end) < 0.002 else { throw UserError("Clips do not cover their segment.") }
+            guard schemaVersion == 2 || abs(clipStart - segment.end) < 0.002 else { throw UserError("Clips do not cover their segment.") }
             expectedStart = segment.end
         }
-        guard abs(expectedStart - duration) < 0.002 else { throw UserError("Rundown does not cover the whole recording.") }
+        guard schemaVersion == 2 || abs(expectedStart - duration) < 0.002 else { throw UserError("Rundown does not cover the whole recording.") }
     }
 
     static func load(_ input: URL) throws -> Rundown {

@@ -64,7 +64,7 @@ enum RundownGenerator {
             guard existing.transcriptFingerprint == fingerprint else {
                 throw UserError("This rundown belongs to a different transcript version. Choose a new --out-dir.")
             }
-            guard LocalIntelligence.savedModelName(engine: existing.engine) == (modelName == "apple" || modelName.contains(":") ? modelName : modelName + ":latest") else {
+            guard existing.schemaVersion == 1, LocalIntelligence.savedModelName(engine: existing.engine) == (modelName == "apple" || modelName.contains(":") ? modelName : modelName + ":latest") else {
                 throw UserError("This rundown was generated with a different model. Choose a new --out-dir to compare models.")
             }
             log("Using existing rundown: \(output.appendingPathComponent("rundown.md").path)")
