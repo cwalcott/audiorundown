@@ -33,7 +33,7 @@ Paths in this code map after the first entry are relative to `Sources/AudioRundo
 ## Preserve these behaviors
 
 - All times refer to the original decoded recording. MP3 container duration can be wrong; preserve PCM normalization for transcription and decoded-duration/accurate-seeking behavior for export.
-- Model responses are untrusted data. Validate IDs, finite time ranges, ordering, containment, and padding before export. Exact-ID selection must remain independent of model availability.
+- Model responses are untrusted data. Validate IDs, finite time ranges, ordering, containment, and padding before export. Exact-ID and range selection must remain independent of model availability. An ID range produces one continuous source span, including gaps; commas select separate exports. Range endpoints follow saved catalog order, and titles come from the saved parent segments.
 - Generated schema-1 rundowns require complete coverage. Imported and API schema-2 rundowns allow gaps but require ordered, nonoverlapping segments and clips within their parent. API drafts must cover all transcript entries; timestamps are derived from validated entry indices. Preserve imported timestamps rather than filling gaps or shifting boundaries.
 - Preserve stable saved IDs and truthful model provenance. Importing a rundown does not call its authoring model. Imported and API catalogs default to Apple for descriptive selection; `--model` can override the selector.
 - Keep existing outputs intact and publish new output directories atomically. Pass subprocess arguments directly, without shell evaluation.

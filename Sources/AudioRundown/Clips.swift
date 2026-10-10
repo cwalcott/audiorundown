@@ -36,12 +36,14 @@ enum Clips {
     static func selectedNames(clip: ClipPlan.Clip, episode: String) throws -> (title: String, file: String) {
         let parts = clip.title.components(separatedBy: ". ")
         let id = parts[0]
-        let hasID = parts.count > 1 && id.range(of: "^[1-9][0-9]*[a-z]*$", options: .regularExpression) != nil
+        let hasID = parts.count > 1 && id.range(of: "^[1-9][0-9]*[a-z]*(?:-[1-9][0-9]*[a-z]*)?$", options: .regularExpression) != nil
         let description = hasID ? parts.dropFirst().joined(separator: ". ") : clip.title
         let episodeTitle = episode.split(whereSeparator: \.isWhitespace).joined(separator: " ")
         let title = ([episodeTitle] + (hasID ? [id] : []) + [shortened(description, limit: 60)]).joined(separator: " · ")
-        let number = String(id.prefix(while: { $0.isNumber }))
-        let paddedID = hasID ? String(repeating: "0", count: max(0, 2 - number.count)) + id : ""
+        let paddedID = hasID ? id.components(separatedBy: "-").map { endpoint in
+            let digits = endpoint.prefix(while: { $0.isNumber }).count
+            return String(repeating: "0", count: max(0, 2 - digits)) + endpoint
+        }.joined(separator: "-") : ""
         // Padded variants retain their source ranges, so separate exports can coexist.
         let range = " [\(clip.start.replacingOccurrences(of: ":", with: "-"))_\(clip.end.replacingOccurrences(of: ":", with: "-"))]"
         let suffix = (clip.includeRangeInFilename == true || !hasID) ? range : ""

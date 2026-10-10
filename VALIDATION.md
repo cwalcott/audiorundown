@@ -10,9 +10,9 @@ swift build -c release
 python3 scripts/test_exports.py .build/release/audiorundown
 ```
 
-The latest verification on October 4, 2026 passed all 32 Swift tests, the release build, and the FFmpeg integration checks on Apple silicon with macOS 27.0.1 and Swift 6.4 / Xcode 27.
+The latest verification on October 10, 2026 passed all 37 Swift tests, the release build, and the FFmpeg integration checks on Apple silicon with macOS 27.0.1 and Swift 6.4 / Xcode 27.
 
-The Swift tests cover time parsing, validated model boundaries, stable IDs, parent/child selection, padding, imported Markdown, source-time preservation, saved preferences, rundown discovery, and safe output handling. Synthetic API responses exercise refusal and incomplete-output handling, cost accounting, and local cache reuse without credentials or paid requests.
+The Swift tests cover time parsing, validated model boundaries, stable IDs, parent/child selection, padding, imported Markdown, source-time preservation, saved preferences, rundown discovery, and safe output handling. Range tests cover mixed IDs and ranges, catalog ordering through multi-letter IDs, cross-segment ranges, containment, and rejection of reversed, unknown, mixed-kind, or partially overlapping selections. Synthetic API responses exercise refusal and incomplete-output handling, cost accounting, and local cache reuse without credentials or paid requests.
 
 The integration script creates temporary audio with three distinct tones. It checks the actual audio content of a cut, MP3 codec and duration, metadata, shortened titles, source-tag fallbacks, successive export folders, overwrite rejection, and invalid ranges. It also exercises importing a rundown and selecting clips using the original MP3 path. Filename checks cover episode-first ordering, stable catalog IDs across batches, different episodes in a shared folder, and time-range suffixes for padded versions. Temporary fixtures are removed after the run.
 
@@ -36,7 +36,7 @@ Model experiments are informal development checks, not a benchmark or a general 
 
 All summaries should be treated as listening guides. Transcripts have no reliable speaker labels, and names may be misrecognized. Review quotations, factual claims, and important listening boundaries against the audio.
 
-Exact-ID selection needs no model. Descriptive selection uses a local model to choose existing IDs and can choose the wrong topic. Use `--preview` to inspect a selection; explicit numeric before/after padding is applied by code. Use `clip` for custom boundaries.
+Exact-ID and range selection need no model. A range exports one continuous span, including intervening audio; its name reuses the saved parent segment title or combines titles across segments. The integration check verifies that a range produces one MP3 with the expected title, duration, and a tone lying in a gap between catalog clips, and that comma-separated IDs still create separate MP3s. Descriptive selection uses a local model to choose existing IDs and can choose the wrong topic. Use `--preview` to inspect a selection; explicit numeric before/after padding is applied by code. Use `clip` for custom boundaries.
 
 Local rundown boundaries follow transcript pieces and may include neighboring material. API boundaries follow transcript entries and can omit silence, applause, or music beyond the final recognized words. Imported rundowns preserve supplied timestamps; timing validation cannot determine whether they describe the correct recording.
 

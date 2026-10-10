@@ -70,11 +70,16 @@ At the selection prompt, enter IDs or describe what you want:
 
 ```text
 1, 3b
+2a-2j
 Export the equipment discussion and the travel tips
 Export the whole interview segment with 10 seconds before it
 ```
 
 IDs export immediately without a model. Descriptions use a local model and may ask for clarification. `list` shows the available IDs, `show 3b` reads an item's summary, and `quit` exits. Selecting a parent and its child exports the parent once. Start with `select ... --preview` to inspect choices without exporting. Selection chooses existing catalog entries; use `clip` below for arbitrary time ranges.
+
+A range such as `2a-2j` creates **one continuous MP3**, from the start of `2a` through the end of `2j`, including any gaps between the clips. Its name uses the saved parent segment title, for example `Studio Notes 2026-06-15 - 02a-02j - Recording techniques.mp3`. No model call is needed to select or name it. Clip ranges can cross segment boundaries (`2h-3b`); ranges of whole segments (`2-4`) also work, with their segment titles combined. Both endpoints must be saved IDs of the same kind, in chronological order.
+
+Use commas for separate files: `2a, 2b` exports two clips; `2a-2j, 4b` exports one combined range plus one separate clip. Contained selections are exported once; partially overlapping ranges are rejected so you can choose a single combined range explicitly. You can also run `audiorundown select recording.mp3 --request "2a-2j" --preview` before exporting.
 
 Selected filenames put the episode first: `Studio Notes 2026-06-15 - 03c - Choosing a microphone.mp3`. The MP3 title is **“Studio Notes 2026-06-15 · 3c · Choosing a microphone”**. The episode comes from the source's title tag, falling back to its filename. Filenames use the rundown ID, with at least two digits, instead of a counter that restarts with each batch. This groups clips by episode and catalog order when they share a folder.
 

@@ -164,4 +164,46 @@ The full story summary is retained in the export record.
     # A saved API preference never affects exact-ID selection or makes a network request.
     run(binary, 'select', source, '--request', '1a', '--preview')
 
+    # A range is one continuous source span, including the tone in the catalog gap.
+    range_guide = root / 'range-guide.md'
+    range_guide.write_text('''# Tone demonstration
+
+## 1. Three tones — 00:00:00–00:00:06
+### Summary
+A demonstration of three tones.
+### Detailed rundown
+**1a. Opening tone — 00:00:00–00:00:01**
+The first tone.
+**1b. Closing tone — 00:00:04–00:00:06**
+The last tone.
+''')
+    range_catalog = root / 'range-catalog'
+    run(binary, 'import-rundown', range_guide, '--transcript', transcript, '--out-dir', range_catalog)
+    range_output = root / 'range-output'
+    run(binary, 'select', range_catalog, '--request', '1a-1b', '--model', 'missing-model', '--out-dir', range_output)
+    range_files = list(range_output.glob('*.mp3'))
+    assert len(range_files) == 1
+    assert range_files[0].name == 'Test episode 2026-06-02 - 01a-01b - Three tones.mp3'
+    range_info = inspect(range_files[0])['format']
+    assert abs(float(range_info['duration']) - 6) < .1
+    assert range_info['tags']['title'] == 'Test episode 2026-06-02 · 1a-1b · Three tones'
+    assert range_info['tags']['track'] == '1/1'
+    range_receipt = json.loads((range_output / 'export.json').read_text())['clips'][0]
+    assert range_receipt['start'] == 0 and range_receipt['end'] == 6
+    assert 'The first tone.' in range_receipt['summary'] and 'The last tone.' in range_receipt['summary']
+    pcm = run(ffmpeg, '-v', 'error', '-i', range_files[0], '-ss', '2.5', '-t', '0.5',
+              '-f', 'f32le', '-ac', '1', '-ar', '8000', '-').stdout
+    samples = array.array('f', pcm)
+    assert power(880) > 100 * max(power(440), power(1320))
+    # Commas still create separate clips; an invalid range publishes nothing.
+    separate_output = root / 'separate-output'
+    run(binary, 'select', range_catalog, '--request', '1a, 1b', '--out-dir', separate_output)
+    assert len(list(separate_output.glob('*.mp3'))) == 2
+    run(binary, 'select', range_catalog, '--request', '1b-1a', '--out-dir', root / 'invalid-range', ok=False)
+    assert not (root / 'invalid-range').exists()
+    interactive = subprocess.run([str(binary), 'select', str(range_catalog), '--preview', '--model', 'missing-model'],
+                                 input='1a - 1b\nquit\n', text=True, capture_output=True)
+    assert interactive.returncode == 0, interactive.stderr
+    assert '1a-1b. Three tones: 00:00:00.000–00:00:06.000' in interactive.stdout
+
 print('Passed audio, metadata, original-MP3 selection, title shortening, source-tag fallback, preferences, and safe-output checks.')

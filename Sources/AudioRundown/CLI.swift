@@ -123,7 +123,7 @@ struct AudioRundown {
       audiorundown rundown INPUT [--model apple|OLLAMA_MODEL|openai:gpt-6.1-sol] [--out-dir DIR] [--language en-US] [--no-download] [--interactive] [--open]
                             [--reasoning medium] [--max-cost 1.00] (OpenAI only)
       audiorundown import-rundown FILE.md --transcript TRANSCRIPT [--out-dir DIR] [--engine LABEL]
-      audiorundown select INPUT [--model apple|OLLAMA_MODEL] [--request "1, 3b"] [--preview] [--out-dir DIR] [--source AUDIO]
+      audiorundown select INPUT [--model apple|OLLAMA_MODEL] [--request "2a-2j, 4b"] [--preview] [--out-dir DIR] [--source AUDIO]
       audiorundown transcribe INPUT [--language en-US] [--out-dir DIR] [--no-download]
       audiorundown clip INPUT --start TIME --end TIME --output FILE.mp3
                          [--title TITLE] [--album ALBUM] [--artist ARTIST]
@@ -166,7 +166,8 @@ struct AudioRundown {
     OpenAI rundown sends the full transcript text to the API using OPENAI_API_KEY; billing is separate.
     API default output: INPUT.transcript/rundown-openai. Saved results are reused without API calls.
     Selection defaults to the saved local model, or Apple for imported/API rundowns.
-    Exact IDs need no model. Use select --model to choose a different local selector.
+    Exact IDs and ranges need no model. A range (2a-2j) exports one continuous MP3.
+    Range names use saved segment titles; commas separate exports. Use select --model for descriptions.
     Default rundown: INPUT.transcript/rundown/{rundown.md,rundown.json}.
     Default selections: INPUT.clips/selection-001/ (then 002, 003…).
     Selected filenames: Episode title - 03c - Clip title.mp3; padded cuts include their range.

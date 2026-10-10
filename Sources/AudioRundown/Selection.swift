@@ -27,9 +27,34 @@ struct ClipIntent: Codable {
 
 enum Selection {
     static func exactIDs(_ request: String) -> [String]? {
-        let tokens = request.lowercased().split { $0.isWhitespace || $0 == "," }.map(String.init)
-        guard !tokens.isEmpty, tokens.allSatisfy({ $0.range(of: "^[1-9][0-9]*[a-z]*$", options: .regularExpression) != nil }) else { return nil }
+        let normalized = request.lowercased().replacingOccurrences(of: "[–—]", with: "-", options: .regularExpression)
+            .replacingOccurrences(of: "\\s*-\\s*", with: "-", options: .regularExpression)
+        let tokens = normalized.split { $0.isWhitespace || $0 == "," }.map(String.init)
+        guard !tokens.isEmpty, tokens.allSatisfy({ $0.range(of: "^[1-9][0-9]*[a-z]*(?:-[1-9][0-9]*[a-z]*)?$", options: .regularExpression) != nil }) else { return nil }
         return tokens
+    }
+
+    /// Expand against catalog order (including z -> aa), never lexical ID order.
+    static func selectedItem(_ token: String, rundown: Rundown) throws -> Rundown.Clip {
+        if let item = rundown.items.first(where: { $0.id == token }) { return item }
+        let ends = token.split(separator: "-", omittingEmptySubsequences: false).map(String.init)
+        guard ends.count == 2 else { throw UserError("Unknown segment or clip ID: \(token). Use list to see the saved IDs.") }
+        let segments = rundown.segments.map {
+            Rundown.Clip(id: $0.id, title: $0.title, start: $0.start, end: $0.end, summary: $0.summary)
+        }
+        let catalog = segments.contains(where: { $0.id == ends[0] }) ? segments : rundown.segments.flatMap(\.clips)
+        guard let start = catalog.firstIndex(where: { $0.id == ends[0] }),
+              let end = catalog.firstIndex(where: { $0.id == ends[1] }) else {
+            throw UserError("Invalid range '\(token)'. Use two saved clip IDs (2a-2j) or two segment IDs (2-4).")
+        }
+        guard start <= end else { throw UserError("Range '\(token)' is backwards. Put the earlier ID first.") }
+        if start == end { return catalog[start] }
+        let items = Array(catalog[start...end])
+        let ids = Set(items.map(\.id))
+        let parents = rundown.segments.filter { ids.contains($0.id) || $0.clips.contains(where: { ids.contains($0.id) }) }
+        let title = parents.map(\.title).joined(separator: " / ")
+        let summary = items.map { "\($0.id). \($0.title)\n\($0.summary)" }.joined(separator: "\n\n")
+        return .init(id: token, title: title, start: items[0].start, end: items[items.count - 1].end, summary: summary)
     }
 
     /// Preserve explicit numeric before/after padding even if a model swaps it.
@@ -59,8 +84,7 @@ enum Selection {
               response.beforeSeconds <= rundown.duration, response.afterSeconds <= rundown.duration else {
             throw UserError("Invalid clip padding.")
         }
-        let known = Set(rundown.items.map(\.id))
-        guard response.ids.allSatisfy(known.contains) else { throw UserError("Unknown segment or clip ID. Use list to see the saved IDs.") }
+        for id in response.ids { _ = try selectedItem(id, rundown: rundown) }
         guard !response.ids.isEmpty || !(response.clarification ?? "").isEmpty else {
             throw UserError("No matching clips. Try a more specific description or exact IDs.")
         }
@@ -71,12 +95,20 @@ enum Selection {
         guard response.clarification == nil || response.clarification!.isEmpty else {
             throw UserError(response.clarification!)
         }
-        let ids = Set(response.ids)
-        let selected = rundown.segments.flatMap { segment -> [Rundown.Clip] in
-            if ids.contains(segment.id) {
-                return [.init(id: segment.id, title: segment.title, start: segment.start, end: segment.end, summary: segment.summary)]
+        let candidates = try Set(response.ids).map { try selectedItem($0, rundown: rundown) }.sorted {
+            if $0.start != $1.start { return $0.start < $1.start }
+            if $0.end != $1.end { return $0.end > $1.end }
+            // Prefer the parent segment when it exactly matches a child's/range's span.
+            if $0.id.count != $1.id.count { return $0.id.count < $1.id.count }
+            return $0.id < $1.id
+        }
+        var selected: [Rundown.Clip] = []
+        for candidate in candidates {
+            if let previous = selected.last, previous.end > candidate.start {
+                if previous.end >= candidate.end { continue }
+                throw UserError("Selections \(previous.id) and \(candidate.id) overlap. Use one combined range or separate nonoverlapping selections.")
             }
-            return segment.clips.filter { ids.contains($0.id) }
+            selected.append(candidate)
         }
         return ClipPlan(album: rundown.title, artist: "AudioRundown", useSourceMetadata: true, clips: selected.map {
             .init(title: "\($0.id). \($0.title)",
@@ -91,6 +123,10 @@ enum Selection {
             let result = SelectionResponse(ids: ids, beforeSeconds: 0, afterSeconds: 0, clarification: nil)
             try validate(result, rundown: rundown)
             return result
+        }
+        // Mistyped ID ranges must not be reinterpreted by a model into different cuts.
+        if request.range(of: "^\\s*[0-9]+[a-z]*\\s*[-–—]", options: [.regularExpression, .caseInsensitive]) != nil {
+            throw UserError("Use IDs or ranges such as 2a-2j, 3b. Range endpoints must be complete saved IDs.")
         }
         let defaultModel = rundown.schemaVersion == 2 ? "apple" : LocalIntelligence.savedModelName(engine: rundown.engine)
         let model = try await LocalIntelligence(modelName: modelName ?? defaultModel)
@@ -161,7 +197,7 @@ enum Selection {
         let source = sourceOverride ?? fileURL(rundown.source)
         if request == nil {
             list(rundown)
-            print("\nEnter IDs (1, 3b), or describe what to export. Commands: list, show ID, quit.")
+            print("\nEnter IDs (1, 3b), a range for one MP3 (2a-2j), or describe what to export. Commands: list, show ID, quit.")
             if preview { print("Preview mode: no files will be exported.") }
         }
         var pending = ""
